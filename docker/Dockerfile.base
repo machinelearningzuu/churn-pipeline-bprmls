@@ -1,0 +1,112 @@
+# Base ML Pipeline Image (Embedded Spark)
+# This serves as the foundation for all ML pipeline services with embedded PySpark
+FROM eclipse-temurin:17-jre AS ml-base
+
+LABEL org.opencontainers.image.source="https://github.com/zuucrew/ml-pipeline"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.description="Base ML Pipeline with embedded PySpark and S3 integration"
+
+# Install Python and system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-dev curl wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symbolic link for python
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+# Create group/user and home dir with proper permissions
+ARG UID=1001
+ARG GID=1001
+RUN addgroup --system --gid $GID app \
+ && adduser --system --uid $UID --ingroup app --home /home/appuser --shell /bin/bash appuser \
+ && mkdir -p /home/appuser /opt/app /tmp/spark /tmp/hadoop \
+ && chown -R appuser:app /home/appuser /opt/app /tmp/spark /tmp/hadoop
+
+# Set working directory
+WORKDIR /opt/app
+
+# Copy requirements and install Python dependencies (including PySpark)
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+
+# Copy project source code with proper ownership
+COPY --chown=appuser:app src/ ./src/
+COPY --chown=appuser:app utils/ ./utils/
+COPY --chown=appuser:app pipelines/ ./pipelines/
+COPY --chown=appuser:app config.yaml .
+
+# Copy shared entrypoint script
+COPY docker/entrypoint-template.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Environment variables (consolidated)
+ENV HOME=/home/appuser \
+    SPARK_LOCAL_DIRS=/tmp/spark \
+    HADOOP_OPTS="-Djava.io.tmpdir=/tmp/hadoop" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/opt/app \
+    PYSPARK_PYTHON=python3 \
+    PYSPARK_DRIVER_PYTHON=python3 \
+    MPLCONFIGDIR=/tmp/matplotlib \
+    GIT_PYTHON_REFRESH=quiet
+
+# Switch to non-root user
+USER appuser
+
+# ================================
+# Data Pipeline Stage
+# ================================
+FROM ml-base AS data-pipeline
+
+LABEL org.opencontainers.image.description="Data Pipeline with embedded PySpark and S3 integration"
+
+# Service-specific environment
+ENV PIPELINE_TYPE=data \
+    PIPELINE_SCRIPT=pipelines/data_pipeline.py \
+    PIPELINE_NAME="Data Preprocessing" \
+    PIPELINE_EMOJI="📊"
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=30s --start-period=120s --retries=2 \
+    CMD python3 -c "import boto3, os; boto3.client('s3').head_bucket(Bucket=os.environ.get('S3_BUCKET', 'zuucrew-mlflow-artifacts-prod'))" || exit 1
+
+ENTRYPOINT ["bash", "/entrypoint.sh"]
+
+# ================================
+# Model Pipeline Stage  
+# ================================
+FROM ml-base AS model-pipeline
+
+LABEL org.opencontainers.image.description="Model Training Pipeline with embedded PySpark, MLflow and S3 integration"
+
+# Service-specific environment
+ENV PIPELINE_TYPE=model \
+    PIPELINE_SCRIPT=pipelines/training_pipeline.py \
+    PIPELINE_NAME="Model Training" \
+    PIPELINE_EMOJI="🎯"
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=30s --start-period=180s --retries=2 \
+    CMD python3 -c "import boto3, mlflow, os; boto3.client('s3').head_bucket(Bucket=os.environ.get('S3_BUCKET', 'zuucrew-mlflow-artifacts-prod'))" || exit 1
+
+ENTRYPOINT ["bash", "/entrypoint.sh"]
+
+# ================================
+# Inference Pipeline Stage
+# ================================
+FROM ml-base AS inference-pipeline
+
+LABEL org.opencontainers.image.description="Inference Pipeline with embedded PySpark, MLflow and S3 integration"
+
+# Service-specific environment
+ENV PIPELINE_TYPE=inference \
+    PIPELINE_SCRIPT=pipelines/inference_pipeline.py \
+    PIPELINE_NAME="Batch Inference" \
+    PIPELINE_EMOJI="🔮"
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=30s --start-period=240s --retries=2 \
+    CMD python3 -c "import boto3, mlflow, os; boto3.client('s3').head_bucket(Bucket=os.environ.get('S3_BUCKET', 'zuucrew-mlflow-artifacts-prod'))" || exit 1
+
+ENTRYPOINT ["bash", "/entrypoint.sh"]

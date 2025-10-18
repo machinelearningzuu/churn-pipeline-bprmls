@@ -1,0 +1,407 @@
+# ==========================================
+# Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+venv/
+ENV/
+env/
+.venv/
+.ENV/
+.env/
+env.bak/
+venv.bak/
+pyvenv.cfg
+
+# ==========================================
+# Jupyter Notebook
+# ==========================================
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+*.ipynb_checkpoints
+
+# ==========================================
+# IDEs
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+.metadata
+.recommenders/
+
+# ==========================================
+# Environment Variables & Secrets
+# ==========================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+secrets.yaml
+secrets.yml
+
+# ==========================================
+# ML Artifacts & Data
+# ==========================================
+artifacts/
+models/
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+*.model
+mlruns/
+mlflow-artifacts/
+
+# Data directories (keep structure, ignore files)
+data/*
+!data/.gitkeep
+!data/raw/.gitkeep
+data/raw/*.csv
+data/processed/*
+data/interim/*
+data/external/*
+
+# Reports
+reports/
+*.html
+*.pdf
+
+# ==========================================
+# Docker
+# ==========================================
+*.log
+docker-compose.override.yml
+.dockerignore.bak
+
+# ==========================================
+# Airflow
+# ==========================================
+airflow/logs/
+airflow/*.db
+airflow/*.pid
+airflow/*.cfg
+airflow/*.err
+airflow/airflow-webserver.pid
+airflow/standalone_admin_password.txt
+logs/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# ==========================================
+# Backup & Archive Directories (EXCLUDE FROM GIT)
+# ==========================================
+ecs-backup/
+backup/
+archive/
+old/
+deprecated/
+temp/
+tmp/
+.backup/
+
+# ==========================================
+# ECS & AWS Deployment Files (ARCHIVED)
+# ==========================================
+ecs-deploy/
+*.ecs
+ecs_*.sh
+*_ecs.py
+ecs_*.template
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+*.tfvars
+
+# ==========================================
+# Redundant Documentation (Keep only essential docs)
+# ==========================================
+# Archive/backup documentation
+docs/ECS_*.md
+docs/AWS_ECS_*.md
+docs/DEPLOYMENT_*.md
+docs/RDS_*.md
+docs/s3_*.md
+docs/SUBNET_*.md
+docs/INACTIVE_*.md
+docs/PLATFORM_*.md
+docs/STOP_RESTART_*.md
+docs/CLEANUP_*.md
+docs/QUICK_START.md
+docs/COMPLETE_TEACHING_GUIDE.md
+docs/Teaching.md
+docs/timestamp_artifacts.md
+docs/docker_optimization_guide.md
+docs/DOCKER_OPTIMIZATION_SUMMARY.md
+docs/DEBUGGING_GUIDE.md
+docs/ARCHITECTURE_TRANSITION.md
+docs/AWS_CLEANUP_SUMMARY.md
+docs/ECS_MIGRATION_ARCHIVE.md
+
+# Old/redundant setup files
+docs/scripts/
+*_COMPLETE.md
+*_SUMMARY.md
+*_ARCHIVE.md
+*_BACKUP.md
+MOVE_TRACKING.md
+FILES_MOVED_SUMMARY.txt
+ARCHIVE_SUMMARY.md
+ECS_SCRIPTS_*.md
+
+changelog.md
+stepplan.md
+CLEANUP_GUIDE.md
+
+
+# ==========================================
+# Redundant Config & Setup Files
+# ==========================================
+config.yaml.student-template
+env.example
+.env.example
+.env.all
+*.example
+*.template.bak
+*_template.sh
+setup_rds.sh
+restart_ecs.sh
+run_ecs.sh
+stop_ecs.sh
+reset_rds_password.sh
+test_rds_connection.sh
+diagnose_ecs_dags.sh
+cleanup_docker.sh
+migrate_to_optimized_docker.sh
+Makefile.ecs
+QUICK_REFERENCE_URLS.md
+ECS_DEPLOYMENT_COMPLETE.md
+ECS_SCRIPTS_REFERENCE.md
+
+# ==========================================
+# Test Coverage & Reports
+# ==========================================
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+nosetests.xml
+test-results/
+junit/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+bandit-report.json
+
+# ==========================================
+# Build & Distribution
+# ==========================================
+*.tar.gz
+*.zip
+*.whl
+*.dmg
+*.exe
+*.msi
+
+# ==========================================
+# OS Files
+# ==========================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msp
+*.msm
+*.lnk
+
+# ==========================================
+# Temporary Files
+# ==========================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+.~*
+\#*\#
+.\#*
+
+# ==========================================
+# Kafka & Streaming
+# ==========================================
+kafka-logs/
+zookeeper-data/
+consumer_offsets/
+
+# ==========================================
+# Spark
+# ==========================================
+spark-warehouse/
+metastore_db/
+derby.log
+*.parquet
+
+# ==========================================
+# MLflow
+# ==========================================
+mlruns/
+mlartifacts/
+mlflow.db
+
+# ==========================================
+# Monitoring & Profiling
+# ==========================================
+*.prof
+*.lprof
+*.pyprof
+*.trace
+
+# ==========================================
+# Notebooks (Optional - uncomment to ignore all notebooks)
+# ==========================================
+# *.ipynb
+
+# ==========================================
+# Documentation Build
+# ==========================================
+docs/_build/
+docs/.doctrees/
+site/
+
+# ==========================================
+# Package Management
+# ==========================================
+poetry.lock
+Pipfile.lock
+pdm.lock
+.pdm.toml
+
+# ==========================================
+# CI/CD
+# ==========================================
+.github/workflows/*_old.yml
+.github/workflows/*_backup.yml
+.github/workflows/ci.yml
+.github/workflows/docker-build.yml
+.github/workflows/cd-deploy.yml
+.github/workflows/ml-monitoring.yml
+.github/workflows/model-training.yml
+
+# Keep only the simplified CI
+!.github/workflows/ci-simplified.yml
+
+# ==========================================
+# Project-Specific Exclusions
+# ==========================================
+# Old prompts and commands
+prompts.md
+commands.md
+
+# Backup configurations
+docker-compose.embedded-spark.backup
+docker-compose.*.backup
+
+# Visualization scripts (if not needed)
+visualize_rds.py
+upload_data_to_s3.py
+
+# Old/redundant guide files
+COMPLETE_GUIDE.pdf
+DEPLOYMENT_ISOLATION.md
+
+# ==========================================
+# Keep These Important Files (Whitelist)
+# ==========================================
+!README.md
+!.gitignore
+!.gitkeep
+!.github/workflows/ci-simplified.yml
+!docs/README.md
+!docs/CI_CD_SIMPLIFIED_SUMMARY.md
+!docs/project_structure.md
+!docs/STARTUP_GUIDE.md
+!docs/KAFKA_QUICKSTART.md
+!docs/STUDENT_SETUP.md
+!tests/README_SIMPLIFIED.md
+!changelog.md
+!stepplan.md
+!config.yaml
+!requirements.txt
+!requirements-mlflow.txt
+!Makefile
+!setup.py
+!run_local.sh
+!docker-compose.yml
+!docker-compose.airflow.yml
+!docker-compose.kafka.yml
+
+# ==========================================
+# S3 Test Files
+# ==========================================
+tests/test_s3_io.py
+
+# ==========================================
+# Node modules (if any frontend)
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==========================================
+# Large Files
+# ==========================================
+*.bin
+*.dat
+*.csv.gz
+*.parquet
+*.feather
