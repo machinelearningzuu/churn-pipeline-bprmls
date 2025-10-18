@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.14-slim
 
 LABEL maintainer="Zuu Crew <hi@zuucrew.ai>"
 LABEL description="Kafka Consumer Service for Real-time ML Inference"
