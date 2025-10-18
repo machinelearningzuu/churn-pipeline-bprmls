@@ -1,6 +1,6 @@
 # Base ML Pipeline Image (Embedded Spark)
 # This serves as the foundation for all ML pipeline services with embedded PySpark
-FROM eclipse-temurin:17-jre AS ml-base
+FROM eclipse-temurin:25-jre AS ml-base
 
 LABEL org.opencontainers.image.source="https://github.com/zuucrew/ml-pipeline"
 LABEL org.opencontainers.image.version="1.0.0"
