@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Data and Artifacts
+data/
+!data/raw/
+!data/raw/**
+artifacts/
+mlruns/
+logs/
+notebooks/
+*.csv
+!data/raw/*.csv
+*.parquet
+*.pkl
+*.joblib
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# VCS
+.git/
+.github/
+.gitignore
+*.git
+
+# Docker (exclude compose files but keep entrypoint scripts)
+Dockerfile
+docker-compose*.yml
+docker-compose*.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Environment
+.env
+.env.local
+.env.*.local
+mlflow.db
+*.db
+
+# Documentation
+docs/
+README.md
+*.md
+
+# Build
+build/
+dist/
+*.tar.gz
+
+# Tests
+tests/
+test_*
+*_test.py
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/

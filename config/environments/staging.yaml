@@ -1,0 +1,62 @@
+# ==========================================
+# Staging Environment Configuration
+# ==========================================
+
+environment: staging
+
+# S3 Configuration
+s3:
+  bucket: churn-pipeline-staging
+  region: ap-south-1
+  paths:
+    raw_data: "staging/data/raw/"
+    processed_data: "staging/data/processed/"
+    models: "staging/models/"
+    artifacts: "staging/artifacts/"
+
+# RDS Configuration
+rds:
+  host: "${RDS_HOST_STAGING}"
+  port: 5432
+  database: "analytics_staging"
+  username: "${RDS_USERNAME_STAGING}"
+  password: "${RDS_PASSWORD_STAGING}"
+  sslmode: "require"
+  pool_size: 5
+  max_overflow: 10
+
+# MLflow Configuration
+mlflow:
+  tracking_uri: "${MLFLOW_TRACKING_URI_STAGING}"
+  experiment_name: "churn-prediction-staging"
+  registry_uri: "s3://churn-pipeline-staging/mlflow/"
+  artifact_location: "s3://churn-pipeline-staging/mlflow-artifacts/"
+
+# Kafka Configuration
+kafka:
+  bootstrap_servers: "kafka-staging.yourcompany.com:9092"
+  topics:
+    customer_events: "staging-customer-events"
+    predictions: "staging-churn-predictions"
+  consumer_group: "staging-churn-consumer"
+  
+# Model Configuration
+model:
+  version: "latest"
+  min_accuracy: 0.75
+  retrain_threshold_days: 30
+  inference_batch_size: 100
+  
+# Monitoring
+monitoring:
+  log_level: "DEBUG"
+  metrics_enabled: true
+  alerting_enabled: false
+  
+# Feature Flags
+features:
+  data_validation: true
+  model_monitoring: true
+  auto_retraining: false
+  a_b_testing: true
+

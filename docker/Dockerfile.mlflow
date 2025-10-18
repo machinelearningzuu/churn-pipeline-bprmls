@@ -1,0 +1,48 @@
+# MLflow Tracking Server
+FROM python:3.11-slim
+
+LABEL org.opencontainers.image.source="https://github.com/zuucrew/ml-pipeline"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.description="MLflow Tracking Server with S3 backend"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements-mlflow.txt .
+RUN pip install --no-cache-dir -r requirements-mlflow.txt
+
+# Create MLflow database directory with proper permissions
+RUN mkdir -p /app/mlflow && chmod 755 /app/mlflow && chown -R appuser:appuser /app
+
+# Copy entrypoint script
+COPY docker/mlflow-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Switch to non-root user
+USER appuser
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MLFLOW_BACKEND_STORE_URI=file:///tmp/mlruns \
+    MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://\${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}/mlflow-artifacts \
+    GIT_PYTHON_REFRESH=quiet
+
+# Expose MLflow port
+EXPOSE 5001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:5001/health || exit 1
+
+# Use entrypoint script
+ENTRYPOINT ["bash", "/entrypoint.sh"]

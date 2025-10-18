@@ -1,0 +1,73 @@
+# ==========================================
+# Production Environment Configuration
+# ==========================================
+
+environment: production
+
+# S3 Configuration
+s3:
+  bucket: churn-pipeline-production
+  region: ap-south-1
+  paths:
+    raw_data: "prod/data/raw/"
+    processed_data: "prod/data/processed/"
+    models: "prod/models/"
+    artifacts: "prod/artifacts/"
+
+# RDS Configuration
+rds:
+  host: "${RDS_HOST_PROD}"
+  port: 5432
+  database: "analytics_production"
+  username: "${RDS_USERNAME_PROD}"
+  password: "${RDS_PASSWORD_PROD}"
+  sslmode: "require"
+  pool_size: 10
+  max_overflow: 20
+
+# MLflow Configuration
+mlflow:
+  tracking_uri: "${MLFLOW_TRACKING_URI_PROD}"
+  experiment_name: "churn-prediction-production"
+  registry_uri: "s3://churn-pipeline-production/mlflow/"
+  artifact_location: "s3://churn-pipeline-production/mlflow-artifacts/"
+
+# Kafka Configuration
+kafka:
+  bootstrap_servers: "kafka-prod-1.yourcompany.com:9092,kafka-prod-2.yourcompany.com:9092,kafka-prod-3.yourcompany.com:9092"
+  topics:
+    customer_events: "customer-events"
+    predictions: "churn-predictions"
+  consumer_group: "prod-churn-consumer"
+  
+# Model Configuration
+model:
+  version: "production"
+  min_accuracy: 0.82
+  retrain_threshold_days: 14
+  inference_batch_size: 500
+  
+# Monitoring
+monitoring:
+  log_level: "INFO"
+  metrics_enabled: true
+  alerting_enabled: true
+  alert_channels:
+    - email
+    - slack
+    - pagerduty
+  
+# Feature Flags
+features:
+  data_validation: true
+  model_monitoring: true
+  auto_retraining: true
+  a_b_testing: true
+  
+# High Availability
+ha:
+  replicas: 3
+  auto_scaling: true
+  min_instances: 2
+  max_instances: 10
+

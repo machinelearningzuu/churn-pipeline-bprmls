@@ -1,0 +1,242 @@
+services:
+  # ================================
+  # LOCAL POSTGRES - ISOLATED FROM ECS
+  # ================================
+  airflow-postgres:
+    image: postgres:15
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - churn-pipeline-network
+
+  airflow-redis:
+    image: redis:7
+    container_name: airflow-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 50
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - churn-pipeline-network
+
+  airflow-webserver:
+    image: churn-pipeline/airflow:2.8.1-amazon
+    container_name: airflow-webserver
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      # LOCAL PostgreSQL Connection (NOT RDS)
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+      # Safe PYTHONPATH - no airflow shadowing
+      PYTHONPATH: "/opt/app/src:/opt/app/utils"
+      PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      # ML Pipeline environment
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-south-1}
+      S3_BUCKET: zuucrew-mlflow-artifacts-prod
+      MLFLOW_TRACKING_URI: http://mlflow-tracking:5001
+      CONTAINERIZED: "true"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./src:/opt/app/src:ro
+      - ./utils:/opt/app/utils:ro
+      - /var/run/docker.sock:/var/run/docker.sock  # Required for DockerOperator
+      - ~/.aws:/home/airflow/.aws:ro
+    ports:
+      - "8080:8080"
+    command: webserver
+    restart: unless-stopped
+    networks:
+      - churn-pipeline-network
+
+  airflow-scheduler:
+    image: churn-pipeline/airflow:2.8.1-amazon
+    container_name: airflow-scheduler
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      # LOCAL PostgreSQL Connection (NOT RDS)
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      # Safe PYTHONPATH - no airflow shadowing
+      PYTHONPATH: "/opt/app/src:/opt/app/utils"
+      PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      # ML Pipeline environment
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-south-1}
+      S3_BUCKET: zuucrew-mlflow-artifacts-prod
+      MLFLOW_TRACKING_URI: http://mlflow-tracking:5001
+      CONTAINERIZED: "true"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./src:/opt/app/src:ro
+      - ./utils:/opt/app/utils:ro
+      - /var/run/docker.sock:/var/run/docker.sock  # Required for DockerOperator
+      - ~/.aws:/home/airflow/.aws:ro
+    command: scheduler
+    restart: unless-stopped
+    networks:
+      - churn-pipeline-network
+
+  airflow-worker:
+    image: churn-pipeline/airflow:2.8.1-amazon
+    container_name: airflow-worker
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      # LOCAL PostgreSQL Connection (NOT RDS)
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      # Safe PYTHONPATH - no airflow shadowing
+      PYTHONPATH: "/opt/app/src:/opt/app/utils"
+      PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      # ML Pipeline environment
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-south-1}
+      S3_BUCKET: zuucrew-mlflow-artifacts-prod
+      MLFLOW_TRACKING_URI: http://mlflow-tracking:5001
+      CONTAINERIZED: "true"
+      # Celery worker specific
+      DUMB_INIT_SETSID: "0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./src:/opt/app/src:ro
+      - ./utils:/opt/app/utils:ro
+      - /var/run/docker.sock:/var/run/docker.sock  # Required for DockerOperator
+      - ~/.aws:/home/airflow/.aws:ro
+    command: celery worker
+    restart: unless-stopped
+    networks:
+      - churn-pipeline-network
+
+  airflow-init:
+    image: churn-pipeline/airflow:2.8.1-amazon
+    container_name: airflow-init
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      # LOCAL PostgreSQL Connection (NOT RDS)
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      PYTHONPATH: "/opt/app/src:/opt/app/utils"
+      PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-south-1}
+      S3_BUCKET: zuucrew-mlflow-artifacts-prod
+      MLFLOW_TRACKING_URI: http://mlflow-tracking:5001
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./src:/opt/app/src:ro
+      - ./utils:/opt/app/utils:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.aws:/home/airflow/.aws:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command: 
+      - |
+        airflow db migrate && \
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com || echo "User already exists" && \
+        echo "✅ Airflow init completed"
+    networks:
+      - churn-pipeline-network
+
+  airflow-flower:
+    image: churn-pipeline/airflow:2.8.1-amazon
+    container_name: airflow-flower
+    user: "${AIRFLOW_UID:-50000}:0"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      # LOCAL PostgreSQL Connection (NOT RDS)
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      PYTHONPATH: "/opt/app/src:/opt/app/utils"
+      PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    ports:
+      - "5555:5555"
+    command: celery flower
+    restart: unless-stopped
+    networks:
+      - churn-pipeline-network
+
+volumes:
+  airflow-postgres-data:
+    name: airflow-postgres-data
+    driver: local
+
+networks:
+  churn-pipeline-network:
+    external: true

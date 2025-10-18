@@ -1,0 +1,33 @@
+# Dockerfile.airflow
+# --- Build args you can tweak from your Makefile if needed
+ARG AIRFLOW_VERSION=2.8.1
+ARG PYTHON_MAJOR_MINOR=3.11
+
+FROM apache/airflow:${AIRFLOW_VERSION}-python${PYTHON_MAJOR_MINOR}
+
+# (Optional) OS packages go in as root, then switch back to 'airflow'
+USER root
+# Uncomment if you actually need extra OS deps
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     build-essential curl && \
+#     rm -rf /var/lib/apt/lists/*
+
+# All Python packages must be installed as the 'airflow' user
+USER airflow
+
+# Always install with Airflow's constraints to ensure compatibility
+# Note: Using hardcoded version in URL since ARG doesn't persist to RUN in all Docker versions
+# Using constraint-compatible versions: amazon 8.16.0 for Airflow 2.8.1
+RUN pip install --no-cache-dir \
+  --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.8.1/constraints-3.11.txt" \
+  apache-airflow-providers-amazon==8.16.0 \
+  apache-airflow-providers-docker==3.* \
+  boto3 \
+  s3fs
+
+# Copy DAG files from local airflow directory
+COPY --chown=airflow:root airflow/dags/*.py /opt/airflow/dags/
+
+# Set maintainer info
+LABEL maintainer="ml_engineering_team"
+LABEL description="Bulletproof Airflow image with Amazon and Docker providers (constraints-based)"

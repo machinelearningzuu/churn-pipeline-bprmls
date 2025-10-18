@@ -1,0 +1,292 @@
+# Processing Engine Configuration (prioritize pandas/scikit-learn)
+processing:
+  default_engine: "pandas"  # "pandas" or "pyspark" - pandas prioritized for faster processing
+  data_processing_engine: "pandas"  # Data preprocessing with pandas
+  model_training_engine: "sklearn"  # Model training with scikit-learn
+  inference_engine: "pandas"  # Inference with pandas (faster for single predictions)
+  fallback_to_pyspark: true  # Allow fallback to PySpark for large datasets
+
+# AWS S3 Configuration
+aws:
+  region: "ap-south-1"  # Change this to your AWS region
+  s3_bucket: "zuucrew-mlflow-artifacts-prod"  # Change this to your S3 bucket name  
+  s3_kms_key_arn: "arn:aws:kms:ap-south-1:899013845787:key/e89689e5-326c-486f-846d-63061b1af579"  # Change this to your KMS key
+  force_s3_io: true  # Always use S3 for all storage
+
+# MLflow Configuration
+
+mlflow:
+  # MLflow URLs - automatically selected based on CONTAINERIZED environment variable
+  local_tracking_uri: "http://localhost:5001"           # Local MLflow server
+  docker_tracking_uri: "http://mlflow-tracking:5001"    # Dockerized MLflow server
+  experiment_name: "Zuu Crew Churn Analysis"
+  artifact_root: "s3://zuucrew-mlflow-artifacts-prod/artifacts/mlflow-artifacts"
+  # S3-based tracking backend (instead of local files)
+  s3_tracking_backend: true
+  s3_tracking_bucket: "zuucrew-mlflow-artifacts-prod"
+  s3_tracking_prefix: "artifacts/mlflow-tracking"
+  model_registry_name: "churn_prediction"
+  artifact_path: "model"
+  run_name_prefix: "churn_run"
+  tags:
+    project: "customer_churn_prediction"
+    team: "ml_engineering"
+    environment: "development"
+  autolog: true
+
+data_paths:
+  raw_data: "s3://zuucrew-mlflow-artifacts-prod/data/raw/ChurnModelling.csv"  # Change to your S3 bucket
+  processed_data: "data/processed/ChurnModelling_Missing_Values_Handled.csv"
+  imputed_data: "data/processed/imputed.csv"
+  processed_dir: "data/processed"
+  artifacts_dir: "artifacts"
+  data_artifacts_dir: "artifacts/data"
+  train_artifacts_dir: "artifacts/train_artifacts"
+  X_train: "artifacts/data/X_train.csv"
+  X_test: "artifacts/data/X_test.csv"
+  Y_train: "artifacts/data/Y_train.csv"
+  Y_test: "artifacts/data/Y_test.csv"
+
+columns:
+  target: "Exited"
+  drop_columns: ["CustomerId", "RowNumber", "Surname"]
+  critical_columns: ["Firstname"]
+  outlier_columns: ["CreditScore", "Age", "NumOfProducts"]
+  nominal_columns: ["Geography", "Gender"]
+  numeric_columns: ["Balance", "EstimatedSalary"]
+  feature_columns:
+    - "CreditScore"
+    - "Geography"
+    - "Gender"
+    - "Age"
+    - "Tenure"
+    - "Balance"
+    - "NumOfProducts"
+    - "HasCrCard"
+    - "IsActiveMember"
+    - "EstimatedSalary"
+
+missing_values:
+  strategy: "fill"
+  methods:
+    age:
+      strategy: "fill"
+      method: "mean"
+      relevant_column: "Age"
+    gender:
+      strategy: "fill"
+      method: "mode"
+      relevant_column: "Gender"
+      use_gender_imputer: true
+
+outlier_detection:
+  detection_method: "iqr"
+  handling_method: "remove"
+  z_score_threshold: 3.0
+
+feature_binning:
+  credit_score_bins:
+    Poor: [300, 580]
+    Fair: [580, 670]
+    Good: [670, 740]
+    Very Good: [740, 800]
+    Excellent: [800, 850]
+  credit_score_mapping:
+    Poor: 0
+    Fair: 1
+    Good: 2
+    Very Good: 3
+    Excellent: 4
+
+feature_encoding:
+  nominal_columns: ["Geography", "Gender"]
+  ordinal_mappings:
+    CreditScoreBins:
+      Poor: 0
+      Fair: 1
+      Good: 2
+      Very Good: 3
+      Excellent: 4
+
+feature_scaling:
+  scaling_type: "minmax"
+  columns_to_scale: ["Balance", "EstimatedSalary", "Age"]
+
+data_splitting:
+  split_type: "simple"
+  test_size: 0.2
+  random_state: 42
+  n_splits: 5
+
+training:
+  default_training_engine: "sklearn"
+  default_model_type: "random_forest"
+  default_training_strategy: "cv"
+  cv_folds: 5
+  random_state: 42
+  test_size: 0.2
+  validation_split: 0.2
+  early_stopping_patience: 10
+  max_iterations: 1000
+  hyperparameter_tuning:
+    enabled: false
+    search_method: "grid"
+    cv_folds: 5
+    n_iter: 20
+  
+  # PySpark-specific training configurations
+  pyspark_training:
+    cache_data: true
+    checkpoint_interval: 10
+    parallelism: "auto"
+    max_memory_fraction: 0.8
+    
+  # Scikit-learn training configurations (backward compatibility)
+  sklearn_training:
+    n_jobs: -1
+    verbose: 1
+
+model:
+  # Training engine: "sklearn" or "pyspark" (default: sklearn for faster processing)
+  training_engine: "sklearn"
+  model_type: "random_forest"
+  training_strategy: "cv"
+  data_path: "data/raw/ChurnModelling.csv"
+  model_path: "artifacts/models/spark_random_forest_cv_model"
+  evaluation_path: "artifacts/evaluation/spark_random_forest_cv_evaluation_report.txt"
+  model_params:
+    numTrees: 100
+    maxDepth: 10
+    seed: 42
+  
+  # Scikit-learn model configurations (backward compatibility)
+  sklearn_model_types:
+    random_forest:
+      n_estimators: 100
+      max_depth: 10
+      random_state: 42
+    gradient_boosting:
+      n_estimators: 100
+      max_depth: 5
+      random_state: 42
+    logistic_regression:
+      random_state: 42
+      max_iter: 1000
+    svm:
+      random_state: 42
+      probability: true
+  
+  # PySpark MLlib model configurations
+  pyspark_model_types:
+    spark_random_forest:
+      numTrees: 100
+      maxDepth: 10
+      minInstancesPerNode: 1
+      seed: 42
+      featuresCol: "features"
+      labelCol: "label"
+      predictionCol: "prediction"
+    spark_gbt:
+      maxIter: 100
+      maxDepth: 5
+      stepSize: 0.1
+      seed: 42
+      featuresCol: "features"
+      labelCol: "label"
+      predictionCol: "prediction"
+    spark_logistic_regression:
+      maxIter: 1000
+      regParam: 0.01
+      elasticNetParam: 0.0
+      seed: 42
+      featuresCol: "features"
+      labelCol: "label"
+      predictionCol: "prediction"
+      probabilityCol: "probability"
+
+evaluation:
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1-score"
+  cv_folds: 5
+  random_state: 42
+
+deployment:
+  model_name: "churn_analysis_model"
+  model_version: "1.0.0"
+  api_endpoint: "/predict"
+  batch_size: 1000
+
+inference:
+  model_name: "random_forest_cv_model"
+  data_path: "artifacts/data/X_test.csv"
+  sample_size: 100
+  save_path: "artifacts/predictions/predictions.csv"
+  batch_size: 1000
+  return_proba: true
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+  file: "pipeline.log"
+
+environment:
+  experiment_name: "churn_analysis"
+
+pipeline:
+  data_pipeline_name: "data_processing_pipeline"
+  training_pipeline_name: "model_training_pipeline"
+  deployment_pipeline_name: "model_deployment_pipeline"
+  inference_pipeline_name: "inference_pipeline"
+  enable_cache: false
+
+# ==========================================
+# Kafka Streaming Configuration
+# ==========================================
+# Kafka bootstrap_servers is read from KAFKA_BOOTSTRAP_SERVERS environment variable
+kafka:
+  # bootstrap_servers: "localhost:9092"  # Commented out - use env var instead
+  topics:
+    customer_events: "customer-events"
+    predictions: "churn-predictions"
+  consumer:
+    group_id: "churn-inference-group"
+    batch_size: 1000
+    timeout_seconds: 30
+    auto_offset_reset: "earliest"
+    enable_auto_commit: true
+    max_poll_records: 1000
+  producer:
+    compression_type: "gzip"
+    max_request_size: 1048576
+    acks: "all"
+    retries: 3
+  schema_registry:
+    enabled: false  # Optional: enable for Avro schema validation
+
+# ==========================================
+# RDS PostgreSQL Configuration
+# ==========================================
+# RDS credentials are read from environment variables:
+# RDS_HOST, RDS_PORT, RDS_DB_NAME, RDS_USERNAME, RDS_PASSWORD
+# rds:
+#   host: "${RDS_HOST}"  # Set via environment variable
+#   port: 5432
+#   database: "${RDS_DB_NAME}"  # Set via environment variable
+#   username: "${RDS_USERNAME}"  # Set via environment variable
+#   password: "${RDS_PASSWORD}"  # Set via environment variable
+#   sslmode: "require"
+#   pool_size: 5
+#   max_overflow: 10
+  
+# ==========================================
+# Analytics Configuration
+# ==========================================
+analytics:
+  aggregation_interval: 3600  # 1 hour in seconds
+  high_risk_threshold: 0.7  # Risk score >= 0.7 triggers alert
+  enable_daily_aggregation: true
+  enable_hourly_aggregation: true
+  retention_days: 90  # Keep raw predictions for 90 days

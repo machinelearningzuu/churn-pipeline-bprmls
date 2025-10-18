@@ -1,0 +1,181 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # KAFKA BROKER (KRaft mode - NO Zookeeper!)
+  # ==========================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-broker
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      # KRaft mode configuration
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_LISTENERS: 'PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093,PLAINTEXT_HOST://0.0.0.0:9094'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      
+      # Cluster configuration
+      CLUSTER_ID: 'churn-pipeline-cluster'
+      
+      # Storage
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      
+      # Performance tuning
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - churn-pipeline-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: >
+      bash -c "
+        # Format storage if not already done
+        if [ ! -f /var/lib/kafka/data/meta.properties ]; then
+          kafka-storage format -t churn-pipeline-cluster -c /etc/kafka/kraft/server.properties
+        fi
+        # Start Kafka
+        /etc/confluent/docker/run
+      "
+
+  # ==========================================
+  # KAFKA UI (Web-based management)
+  # ==========================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: churn-pipeline
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: 'true'
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - churn-pipeline-network
+
+  # ==========================================
+  # PRODUCER SERVICE
+  # ==========================================
+  producer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.kafka-producer
+    container_name: kafka-producer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: customer-events
+      RUNNING_IN_DOCKER: 'true'
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data:ro
+      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - churn-pipeline-network
+    command: python producer_service.py --mode streaming --rate 10 --duration 3600
+
+  # ==========================================
+  # CONSUMER SERVICE (INFERENCE ENGINE)
+  # ==========================================
+  consumer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.kafka-consumer
+    container_name: kafka-consumer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      BATCH_SIZE: 1000
+      TIMEOUT_SECONDS: 30
+      RUNNING_IN_DOCKER: 'true'
+      
+      # AWS credentials for S3 access
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-south-1}
+      
+      # MLflow
+      MLFLOW_TRACKING_URI: http://mlflow:5001
+      
+      # RDS database
+      RDS_HOST: ${RDS_HOST}
+      RDS_PORT: ${RDS_PORT:-5432}
+      RDS_DB_NAME: ${RDS_DB_NAME}
+      RDS_USERNAME: ${RDS_USERNAME}
+      RDS_PASSWORD: ${RDS_PASSWORD}
+      
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./artifacts:/app/artifacts  # Local model artifacts cache
+    networks:
+      - churn-pipeline-network
+    restart: unless-stopped
+    command: python consumer_service.py --continuous --poll-interval 5
+
+  # ==========================================
+  # ANALYTICS SERVICE (RDS Writer)
+  # ==========================================
+  analytics:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.kafka-analytics
+    container_name: kafka-analytics
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      RUNNING_IN_DOCKER: 'true'
+      
+      # RDS database
+      RDS_HOST: ${RDS_HOST}
+      RDS_PORT: ${RDS_PORT:-5432}
+      RDS_DB_NAME: ${RDS_DB_NAME}
+      RDS_USERNAME: ${RDS_USERNAME}
+      RDS_PASSWORD: ${RDS_PASSWORD}
+      
+    depends_on:
+      kafka:
+        condition: service_healthy
+      consumer:
+        condition: service_started
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - churn-pipeline-network
+    restart: unless-stopped
+    command: python analytics_service.py
+
+# ==========================================
+# VOLUMES
+# ==========================================
+volumes:
+  kafka-data:
+    driver: local
+
+# ==========================================
+# NETWORKS
+# ==========================================
+networks:
+  churn-pipeline-network:
+    name: churn-pipeline-network
+    external: true
+

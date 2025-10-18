@@ -1,0 +1,42 @@
+FROM python:3.10-slim
+
+LABEL maintainer="Zuu Crew <hi@zuucrew.ai>"
+LABEL description="Kafka Producer Service for Customer Events"
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY kafka/producer_service.py /app/producer_service.py
+COPY utils/ /app/utils/
+
+# Copy only raw data (other subdirs may be gitignored)
+COPY data/raw/ /app/data/raw/
+
+# Create config placeholder
+RUN touch /app/config.yaml
+
+# Set Python path
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Default command
+CMD ["python", "producer_service.py", "--mode", "streaming", "--rate", "5", "--duration", "3600"]
+

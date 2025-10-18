@@ -1,0 +1,157 @@
+name: ml-pipeline-optimized
+
+services:
+  # ================================
+  # MLflow Tracking Server
+  # ================================
+  mlflow-tracking:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mlflow
+    image: churn-pipeline/mlflow:latest
+    container_name: mlflow-tracking
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    environment:
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_SHARED_CREDENTIALS_FILE=/aws/credentials
+      - AWS_CONFIG_FILE=/aws/config
+      - AWS_PROFILE=${AWS_PROFILE:-default}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      # LOCAL: SQLite Backend Store (file-based, no external DB needed)
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db
+      # LOCAL: S3 for artifacts (still uses AWS S3)
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}/artifacts/mlflow-artifacts
+    volumes:
+      - ~/.aws:/aws:ro
+      - mlflow-db:/mlflow
+    networks:
+      - ml-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ================================
+  # Data Processing Pipeline
+  # ================================
+  data-pipeline:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+      target: data-pipeline
+      args:
+        UID: 1001
+        GID: 1001
+    image: churn-pipeline/data:latest
+    container_name: data-pipeline
+    env_file:
+      - .env
+    environment:
+      - HOME=/home/appuser
+      - SPARK_LOCAL_DIRS=/tmp/spark
+      - HADOOP_OPTS=-Djava.io.tmpdir=/tmp/hadoop
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_SHARED_CREDENTIALS_FILE=/aws/credentials
+      - AWS_CONFIG_FILE=/aws/config
+      - AWS_PROFILE=${AWS_PROFILE:-default}
+      - S3_BUCKET=${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}
+      - MLFLOW_TRACKING_URI=http://mlflow-tracking:5001
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      - ~/.aws:/aws:ro
+    networks:
+      - ml-net
+    depends_on:
+      mlflow-tracking:
+        condition: service_healthy
+    restart: "no"
+
+  # ================================
+  # Model Training Pipeline
+  # ================================
+  model-pipeline:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+      target: model-pipeline
+      args:
+        UID: 1001
+        GID: 1001
+    image: churn-pipeline/model:latest
+    container_name: model-pipeline
+    env_file:
+      - .env
+    environment:
+      - HOME=/home/appuser
+      - SPARK_LOCAL_DIRS=/tmp/spark
+      - HADOOP_OPTS=-Djava.io.tmpdir=/tmp/hadoop
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_SHARED_CREDENTIALS_FILE=/aws/credentials
+      - AWS_CONFIG_FILE=/aws/config
+      - AWS_PROFILE=${AWS_PROFILE:-default}
+      - S3_BUCKET=${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}
+      - MLFLOW_TRACKING_URI=http://mlflow-tracking:5001
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      - ~/.aws:/aws:ro
+    networks:
+      - ml-net
+    depends_on:
+      mlflow-tracking:
+        condition: service_healthy
+    restart: "no"
+
+  # ================================
+  # Inference Pipeline
+  # ================================
+  inference-pipeline:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+      target: inference-pipeline
+      args:
+        UID: 1001
+        GID: 1001
+    image: churn-pipeline/inference:latest
+    container_name: inference-pipeline
+    env_file:
+      - .env
+    environment:
+      - HOME=/home/appuser
+      - SPARK_LOCAL_DIRS=/tmp/spark
+      - HADOOP_OPTS=-Djava.io.tmpdir=/tmp/hadoop
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - AWS_SHARED_CREDENTIALS_FILE=/aws/credentials
+      - AWS_CONFIG_FILE=/aws/config
+      - AWS_PROFILE=${AWS_PROFILE:-default}
+      - S3_BUCKET=${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}
+      - MLFLOW_TRACKING_URI=http://mlflow-tracking:5001
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      - ~/.aws:/aws:ro
+    networks:
+      - ml-net
+    depends_on:
+      mlflow-tracking:
+        condition: service_healthy
+    restart: "no"
+
+networks:
+  ml-net:
+    driver: bridge
+    name: churn-pipeline-network
+
+volumes:
+  mlflow-db:
+    driver: local
+    name: mlflow-database

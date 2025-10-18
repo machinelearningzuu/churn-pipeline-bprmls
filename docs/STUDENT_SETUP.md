@@ -1,0 +1,1 @@
+Now I want to to create comprehensive Teacheing.md document. From the inital codebase to what we added today inclusingn How to setection tools we used, S3 migration, Dockerization and all things in a seperate documents. specially explain about docker files inside what is the meaning. also the major code chnages in src and pipelines explain clearly
