@@ -46,7 +46,7 @@ setup(
             "flake8>=5.0.0",
         ],
         "airflow": [
-            "apache-airflow>=2.7.0,<2.8.0",
+            "apache-airflow>=2.7.0,<3.1.0",
             "apache-airflow-providers-apache-spark>=3.0.0",
         ],
         "kafka": [
