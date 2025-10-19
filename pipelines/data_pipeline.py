@@ -239,7 +239,7 @@ def _run_pandas_pipeline(data_path, target_column, test_size, force_rebuild, out
         run_tags = create_mlflow_run_tags(pipeline_type="data_processing")
         run_tags['engine'] = 'pandas'
         run_tags['timestamp'] = pipeline_timestamp
-        mlflow_tracker.start_run(run_name=f"data_pipeline_pandas_{pipeline_timestamp}", tags=run_tags)
+        mlflow_tracker.start_run(run_name=f"Data Pipeline | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", tags=run_tags)
         setup_mlflow_autolog()
         
         # 1. Data Ingestion using pandas
@@ -751,7 +751,7 @@ def _run_pyspark_pipeline(data_path, target_column, test_size, force_rebuild, ou
             'output_format': output_format,
             'processing_engine': 'pyspark'
         })
-        run = mlflow_tracker.start_run(run_name='data_pipeline_pyspark', tags=run_tags)
+        run = mlflow_tracker.start_run(run_name=f"Data Pipeline | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", tags=run_tags)
         
         # MLflow artifacts are now handled by S3 backend, no local directory needed
         

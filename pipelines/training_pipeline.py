@@ -220,7 +220,7 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
             'training_timestamp': pipeline_timestamp,
             'environment': 'development'
         }
-        mlflow_tracker.start_run(run_name=f"sklearn_training_{pipeline_timestamp}", tags=run_tags)
+        mlflow_tracker.start_run(run_name=f"Training Pipeline | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", tags=run_tags)
         
         # Log model parameters
         model_params_final = {
@@ -489,7 +489,7 @@ def _train_pyspark_model_wrapper(data_path, model_params, test_size, random_stat
                 'data_format': data_format
             }
         )
-        run = mlflow_tracker.start_run(run_name='training_pipeline', tags=run_tags)
+        run = mlflow_tracker.start_run(run_name=f"Training Pipeline | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", tags=run_tags)
 
         # Load processed data using latest S3 artifacts
         logger.info("Loading processed training data from S3...")

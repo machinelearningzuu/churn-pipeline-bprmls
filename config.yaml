@@ -19,7 +19,7 @@ mlflow:
   # MLflow URLs - automatically selected based on CONTAINERIZED environment variable
   local_tracking_uri: "http://localhost:5001"           # Local MLflow server
   docker_tracking_uri: "http://mlflow-tracking:5001"    # Dockerized MLflow server
-  experiment_name: "Zuu Crew Churn Analysis"
+  experiment_name: "Churn Analysis"
   artifact_root: "s3://zuucrew-mlflow-artifacts-prod/artifacts/mlflow-artifacts"
   # S3-based tracking backend (instead of local files)
   s3_tracking_backend: true
