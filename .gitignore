@@ -334,13 +334,6 @@ pdm.lock
 # ==========================================
 .github/workflows/*_old.yml
 .github/workflows/*_backup.yml
-.github/workflows/docker-build.yml
-.github/workflows/cd-deploy.yml
-.github/workflows/ml-monitoring.yml
-.github/workflows/model-training.yml
-
-# Keep only the main CI workflow
-!.github/workflows/ci.yml
 
 # ==========================================
 # Project-Specific Exclusions
@@ -367,7 +360,6 @@ DEPLOYMENT_ISOLATION.md
 !README.md
 !.gitignore
 !.gitkeep
-!.github/workflows/ci.yml
 !docs/README.md
 !docs/CI_CD_SIMPLIFIED_SUMMARY.md
 !docs/project_structure.md
