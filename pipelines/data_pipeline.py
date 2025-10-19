@@ -517,127 +517,162 @@ def _run_pandas_pipeline(data_path, target_column, test_size, force_rebuild, out
         
         # 6. Save processed data and encoders
         step_start = time.time()
-        logger.info(f"\n{'='*60}")
-        logger.info("💾 STEP 6: SAVE PROCESSED DATA & ENCODERS TO S3")
-        logger.info(f"{'='*60}")
-        from utils.s3_io import write_df_csv, write_pickle
-        import json
+        skip_s3 = os.environ.get('SKIP_S3_UPLOAD', 'false').lower() == 'true'
         
-        # Prepare S3 paths with timestamp
-        s3_paths = {
-            'X_train': f"artifacts/data_artifacts/{pipeline_timestamp}/X_train.csv",
-            'X_test': f"artifacts/data_artifacts/{pipeline_timestamp}/X_test.csv",
-            'y_train': f"artifacts/data_artifacts/{pipeline_timestamp}/y_train.csv",
-            'y_test': f"artifacts/data_artifacts/{pipeline_timestamp}/y_test.csv",
-            'encoders': f"artifacts/data_artifacts/{pipeline_timestamp}/encoders.pkl",
-            'geography_encoder': f"artifacts/data_artifacts/{pipeline_timestamp}/geography_encoder.json",
-            'gender_encoder': f"artifacts/data_artifacts/{pipeline_timestamp}/gender_encoder.json",
-            'scaler': f"artifacts/data_artifacts/{pipeline_timestamp}/scaler.pkl",
-            'feature_names': f"artifacts/data_artifacts/{pipeline_timestamp}/feature_names.json"
-        }
-        
-        logger.info(f"📁 S3 artifact paths:")
-        for name, path in s3_paths.items():
-            logger.info(f"  • {name}: s3://zuucrew-mlflow-artifacts-prod/{path}")
-        
-        # Save datasets to S3
-        datasets = {
-            'X_train': X_train,
-            'X_test': X_test, 
-            'y_train': y_train.to_frame(),
-            'y_test': y_test.to_frame()
-        }
-        
-        logger.info(f"💾 Uploading {len(datasets)} datasets to S3...")
-        for name, dataset in datasets.items():
-            dataset_size = dataset.memory_usage(deep=True).sum() / 1024**2
-            logger.info(f"📤 Uploading {name}: {dataset.shape[0]:,} rows × {dataset.shape[1]} cols ({dataset_size:.2f} MB)")
-            write_df_csv(dataset, key=s3_paths[name])
-            logger.info(f"  ✅ {name} uploaded successfully")
-        
-        # Save encoders and preprocessing artifacts
-        logger.info(f"\n🔧 Uploading preprocessing artifacts...")
-        
-        # 1. Save encoders (LabelEncoders for Geography, Gender)
-        logger.info(f"📝 Saving categorical encoders...")
-        write_pickle(encoders, key=s3_paths['encoders'])
-        logger.info(f"  ✅ encoders.pkl: {len(encoders)} encoders (Geography, Gender)")
-        
-        # 2. Save individual encoder JSON files (ONE-HOT ENCODING)
-        from utils.s3_io import put_bytes
-        
-        for col, encoder_info in encoders.items():
-            encoder_data = {
-                'column_name': col,
-                'encoder_type': 'one_hot',
-                'categories': encoder_info['categories'],
-                'binary_columns': [f"{col}_{val}" for val in encoder_info['categories']],
-                'num_categories': len(encoder_info['categories']),
-                'timestamp': pipeline_timestamp,
-                'processing_engine': 'pandas'
+        if skip_s3:
+            logger.info(f"\n{'='*60}")
+            logger.info("💾 STEP 6: SAVE PROCESSED DATA LOCALLY (S3 disabled for CI)")
+            logger.info(f"{'='*60}")
+            import pickle
+            
+            # Save locally for CI
+            logger.info(f"💾 Saving datasets locally to artifacts/data/...")
+            os.makedirs("artifacts/data", exist_ok=True)
+            
+            # Save test data for validation
+            test_data = {
+                'X_test': X_test,
+                'y_test': y_test
+            }
+            with open("artifacts/data/test_data.pkl", 'wb') as f:
+                pickle.dump(test_data, f)
+            logger.info(f"  ✅ test_data.pkl saved (for model validation)")
+            
+            # Save all data artifacts
+            X_train.to_pickle("artifacts/data/X_train.pkl")
+            X_test.to_pickle("artifacts/data/X_test.pkl")
+            y_train.to_pickle("artifacts/data/y_train.pkl")
+            y_test.to_pickle("artifacts/data/y_test.pkl")
+            
+            with open("artifacts/data/encoders.pkl", 'wb') as f:
+                pickle.dump(encoders, f)
+            with open("artifacts/data/scaler.pkl", 'wb') as f:
+                pickle.dump(scaler, f)
+            
+            logger.info(f"  ✅ All artifacts saved locally")
+            
+        else:
+            logger.info(f"\n{'='*60}")
+            logger.info("💾 STEP 6: SAVE PROCESSED DATA & ENCODERS TO S3")
+            logger.info(f"{'='*60}")
+            from utils.s3_io import write_df_csv, write_pickle
+            import json
+            
+            # Prepare S3 paths with timestamp
+            s3_paths = {
+                'X_train': f"artifacts/data_artifacts/{pipeline_timestamp}/X_train.csv",
+                'X_test': f"artifacts/data_artifacts/{pipeline_timestamp}/X_test.csv",
+                'y_train': f"artifacts/data_artifacts/{pipeline_timestamp}/y_train.csv",
+                'y_test': f"artifacts/data_artifacts/{pipeline_timestamp}/y_test.csv",
+                'encoders': f"artifacts/data_artifacts/{pipeline_timestamp}/encoders.pkl",
+                'geography_encoder': f"artifacts/data_artifacts/{pipeline_timestamp}/geography_encoder.json",
+                'gender_encoder': f"artifacts/data_artifacts/{pipeline_timestamp}/gender_encoder.json",
+                'scaler': f"artifacts/data_artifacts/{pipeline_timestamp}/scaler.pkl",
+                'feature_names': f"artifacts/data_artifacts/{pipeline_timestamp}/feature_names.json"
             }
             
-            encoder_json = json.dumps(encoder_data, indent=2)
-            s3_key = s3_paths[f'{col.lower()}_encoder']
-            put_bytes(encoder_json.encode('utf-8'), key=s3_key)
+            logger.info(f"📁 S3 artifact paths:")
+            for name, path in s3_paths.items():
+                logger.info(f"  • {name}: s3://zuucrew-mlflow-artifacts-prod/{path}")
             
-            logger.info(f"  ✅ {col.lower()}_encoder.json: {col} one-hot encoder mapping")
-            logger.info(f"    • Categories: {encoder_data['categories']}")
-            logger.info(f"    • Binary columns: {encoder_data['binary_columns']}")
-            logger.info(f"    • File: s3://zuucrew-mlflow-artifacts-prod/{s3_key}")
-        
-        # 3. Save scaler with metadata
-        logger.info(f"📏 Saving feature scaler with metadata...")
-        write_pickle(scaler, key=s3_paths['scaler'])
-        
-        # Save scaler metadata for inference
-        scaler_metadata = {
-            'columns_to_scale': available_numeric,
-            'data_min': scaler.data_min_.tolist(),
-            'data_max': scaler.data_max_.tolist(),
-            'n_features': len(available_numeric),
-            'scaling_type': 'minmax',
-            'framework': 'sklearn',
-            'timestamp': pipeline_timestamp
-        }
-        scaler_metadata_key = f"artifacts/data_artifacts/{pipeline_timestamp}/scaler_metadata.json"
-        scaler_metadata_json = json.dumps(scaler_metadata, indent=2)
-        put_bytes(scaler_metadata_json.encode('utf-8'), key=scaler_metadata_key)
-        
-        logger.info(f"  ✅ scaler.pkl: MinMaxScaler for {len(available_numeric)} numeric features")
-        logger.info(f"    • Scaled features: {available_numeric}")
-        logger.info(f"  ✅ scaler_metadata.json: Scaler parameters for inference")
-        logger.info(f"    • Min values: {[f'{v:.2f}' for v in scaler.data_min_]}")
-        logger.info(f"    • Max values: {[f'{v:.2f}' for v in scaler.data_max_]}")
-        
-        # 4. Save feature names and metadata
-        feature_metadata = {
-            'feature_columns': X_train.columns.tolist(),
-            'target_column': target_column,
-            'categorical_columns': available_categorical,
-            'numeric_columns': available_numeric,
-            'original_shape': [int(df.shape[0]), int(df.shape[1])],
-            'processed_shape': [int(X_train.shape[0]), int(X_train.shape[1])],
-            'test_size': test_size,
-            'processing_engine': 'pandas',
-            'timestamp': pipeline_timestamp
-        }
-        
-        feature_json = json.dumps(feature_metadata, indent=2)
-        put_bytes(feature_json.encode('utf-8'), key=s3_paths['feature_names'])
-        logger.info(f"  ✅ feature_names.json: Dataset metadata and feature information")
-        logger.info(f"    • Features: {len(feature_metadata['feature_columns'])} columns")
-        logger.info(f"    • Categorical: {feature_metadata['categorical_columns']}")
-        logger.info(f"    • Numeric: {feature_metadata['numeric_columns']}")
-        
-        step_time = time.time() - step_start
-        logger.info(f"✅ DATA & PREPROCESSING ARTIFACTS SAVED")
-        logger.info(f"📊 Total artifacts saved: {len(s3_paths)}")
-        logger.info(f"  • Datasets: 4 files (X_train, X_test, y_train, y_test)")
-        logger.info(f"  • Encoders: 3 files (encoders.pkl, geography_encoder.json, gender_encoder.json)")
-        logger.info(f"  • Scaler: 1 file (scaler.pkl)")
-        logger.info(f"  • Metadata: 1 file (feature_names.json)")
-        logger.info(f"⏱️ Upload time: {step_time:.2f} seconds")
+            # Save datasets to S3
+            datasets = {
+                'X_train': X_train,
+                'X_test': X_test, 
+                'y_train': y_train.to_frame(),
+                'y_test': y_test.to_frame()
+            }
+            
+            logger.info(f"💾 Uploading {len(datasets)} datasets to S3...")
+            for name, dataset in datasets.items():
+                dataset_size = dataset.memory_usage(deep=True).sum() / 1024**2
+                logger.info(f"📤 Uploading {name}: {dataset.shape[0]:,} rows × {dataset.shape[1]} cols ({dataset_size:.2f} MB)")
+                write_df_csv(dataset, key=s3_paths[name])
+                logger.info(f"  ✅ {name} uploaded successfully")
+            
+            # Save encoders and preprocessing artifacts
+            logger.info(f"\n🔧 Uploading preprocessing artifacts...")
+            
+            # 1. Save encoders (LabelEncoders for Geography, Gender)
+            logger.info(f"📝 Saving categorical encoders...")
+            write_pickle(encoders, key=s3_paths['encoders'])
+            logger.info(f"  ✅ encoders.pkl: {len(encoders)} encoders (Geography, Gender)")
+            
+            # 2. Save individual encoder JSON files (ONE-HOT ENCODING)
+            from utils.s3_io import put_bytes
+            
+            for col, encoder_info in encoders.items():
+                encoder_data = {
+                    'column_name': col,
+                    'encoder_type': 'one_hot',
+                    'categories': encoder_info['categories'],
+                    'binary_columns': [f"{col}_{val}" for val in encoder_info['categories']],
+                    'num_categories': len(encoder_info['categories']),
+                    'timestamp': pipeline_timestamp,
+                    'processing_engine': 'pandas'
+                }
+                
+                encoder_json = json.dumps(encoder_data, indent=2)
+                s3_key = s3_paths[f'{col.lower()}_encoder']
+                put_bytes(encoder_json.encode('utf-8'), key=s3_key)
+                
+                logger.info(f"  ✅ {col.lower()}_encoder.json: {col} one-hot encoder mapping")
+                logger.info(f"    • Categories: {encoder_data['categories']}")
+                logger.info(f"    • Binary columns: {encoder_data['binary_columns']}")
+                logger.info(f"    • File: s3://zuucrew-mlflow-artifacts-prod/{s3_key}")
+            
+            # 3. Save scaler with metadata
+            logger.info(f"📏 Saving feature scaler with metadata...")
+            write_pickle(scaler, key=s3_paths['scaler'])
+            
+            # Save scaler metadata for inference
+            scaler_metadata = {
+                'columns_to_scale': available_numeric,
+                'data_min': scaler.data_min_.tolist(),
+                'data_max': scaler.data_max_.tolist(),
+                'n_features': len(available_numeric),
+                'scaling_type': 'minmax',
+                'framework': 'sklearn',
+                'timestamp': pipeline_timestamp
+            }
+            scaler_metadata_key = f"artifacts/data_artifacts/{pipeline_timestamp}/scaler_metadata.json"
+            scaler_metadata_json = json.dumps(scaler_metadata, indent=2)
+            put_bytes(scaler_metadata_json.encode('utf-8'), key=scaler_metadata_key)
+            
+            logger.info(f"  ✅ scaler.pkl: MinMaxScaler for {len(available_numeric)} numeric features")
+            logger.info(f"    • Scaled features: {available_numeric}")
+            logger.info(f"  ✅ scaler_metadata.json: Scaler parameters for inference")
+            logger.info(f"    • Min values: {[f'{v:.2f}' for v in scaler.data_min_]}")
+            logger.info(f"    • Max values: {[f'{v:.2f}' for v in scaler.data_max_]}")
+            
+            # 4. Save feature names and metadata
+            feature_metadata = {
+                'feature_columns': X_train.columns.tolist(),
+                'target_column': target_column,
+                'categorical_columns': available_categorical,
+                'numeric_columns': available_numeric,
+                'original_shape': [int(df.shape[0]), int(df.shape[1])],
+                'processed_shape': [int(X_train.shape[0]), int(X_train.shape[1])],
+                'test_size': test_size,
+                'processing_engine': 'pandas',
+                'timestamp': pipeline_timestamp
+            }
+            
+            feature_json = json.dumps(feature_metadata, indent=2)
+            put_bytes(feature_json.encode('utf-8'), key=s3_paths['feature_names'])
+            logger.info(f"  ✅ feature_names.json: Dataset metadata and feature information")
+            logger.info(f"    • Features: {len(feature_metadata['feature_columns'])} columns")
+            logger.info(f"    • Categorical: {feature_metadata['categorical_columns']}")
+            logger.info(f"    • Numeric: {feature_metadata['numeric_columns']}")
+            
+            step_time = time.time() - step_start
+            logger.info(f"✅ DATA & PREPROCESSING ARTIFACTS SAVED")
+            logger.info(f"📊 Total artifacts saved: {len(s3_paths)}")
+            logger.info(f"  • Datasets: 4 files (X_train, X_test, y_train, y_test)")
+            logger.info(f"  • Encoders: 3 files (encoders.pkl, geography_encoder.json, gender_encoder.json)")
+            logger.info(f"  • Scaler: 1 file (scaler.pkl)")
+            logger.info(f"  • Metadata: 1 file (feature_names.json)")
+            logger.info(f"⏱️ Upload time: {step_time:.2f} seconds")
         
         # Pipeline completion summary
         total_pipeline_time = time.time() - pipeline_start

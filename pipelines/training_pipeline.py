@@ -265,108 +265,137 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
         
         accuracy = metrics['accuracy']
         
-        # Save model and training artifacts to S3
-        logger.info(f"\n{'='*60}")
-        logger.info("💾 STEP 7: SAVE MODEL & TRAINING ARTIFACTS TO S3")
-        logger.info(f"{'='*60}")
+        # Check if we should skip S3 (for CI)
+        import os
+        skip_s3 = os.environ.get('SKIP_S3_UPLOAD', 'false').lower() == 'true'
         
-        from utils.s3_io import write_pickle, put_bytes
-        import json
-        
-        # Prepare S3 paths for training artifacts
-        train_s3_paths = {
-            'model': f"artifacts/train_artifacts/{pipeline_timestamp}/sklearn_model.pkl",
-            'model_metadata': f"artifacts/train_artifacts/{pipeline_timestamp}/model_metadata.json",
-            'training_metrics': f"artifacts/train_artifacts/{pipeline_timestamp}/training_metrics.json",
-            'model_params': f"artifacts/train_artifacts/{pipeline_timestamp}/model_params.json",
-            'feature_importance': f"artifacts/train_artifacts/{pipeline_timestamp}/feature_importance.json"
-        }
-        
-        logger.info(f"📁 S3 training artifact paths:")
-        for name, path in train_s3_paths.items():
-            logger.info(f"  • {name}: s3://zuucrew-mlflow-artifacts-prod/{path}")
-        
-        # 1. Save trained model
-        logger.info(f"🤖 Saving trained model...")
-        write_pickle(model, key=train_s3_paths['model'])
-        logger.info(f"  ✅ sklearn_model.pkl: RandomForest model uploaded")
-        
-        # 2. Save model metadata
-        model_metadata = {
-            'model_type': 'RandomForestClassifier',
-            'framework': 'scikit-learn',
-            'training_engine': 'sklearn',
-            'accuracy': float(accuracy),
-            'n_estimators': model.n_estimators,
-            'max_depth': model.max_depth,
-            'random_state': model.random_state,
-            'feature_count': X_train.shape[1],
-            'training_samples': X_train.shape[0],
-            'test_samples': X_test.shape[0],
-            'timestamp': pipeline_timestamp,
-            'data_artifacts_timestamp': latest_timestamp  # Links to data artifacts used
-        }
-        
-        metadata_json = json.dumps(model_metadata, indent=2)
-        put_bytes(metadata_json.encode('utf-8'), key=train_s3_paths['model_metadata'])
-        logger.info(f"  ✅ model_metadata.json: Model configuration and info")
-        
-        # 3. Save training metrics
-        training_metrics = {
-            'accuracy': float(accuracy),
-            'test_accuracy': float(accuracy),
-            'training_time_seconds': 4.66,  # Approximate from logs
-            'model_size_features': X_train.shape[1],
-            'training_samples': X_train.shape[0],
-            'test_samples': X_test.shape[0],
-            'target_distribution': {
-                'class_0': int((y_test == 0).sum()),
-                'class_1': int((y_test == 1).sum())
-            },
-            'timestamp': pipeline_timestamp
-        }
-        
-        metrics_json = json.dumps(training_metrics, indent=2)
-        put_bytes(metrics_json.encode('utf-8'), key=train_s3_paths['training_metrics'])
-        logger.info(f"  ✅ training_metrics.json: Performance metrics")
-        
-        # 4. Save model parameters
-        model_params_data = {
-            'n_estimators': int(model.n_estimators),
-            'max_depth': int(model.max_depth) if model.max_depth else None,
-            'random_state': int(model.random_state) if model.random_state else None,
-            'min_samples_split': int(model.min_samples_split),
-            'min_samples_leaf': int(model.min_samples_leaf),
-            'bootstrap': bool(model.bootstrap),
-            'timestamp': pipeline_timestamp
-        }
-        
-        params_json = json.dumps(model_params_data, indent=2)
-        put_bytes(params_json.encode('utf-8'), key=train_s3_paths['model_params'])
-        logger.info(f"  ✅ model_params.json: Model hyperparameters")
-        
-        # 5. Save feature importance
-        feature_names = [f"feature_{i}" for i in range(X_train.shape[1])]  # Generic names for now
-        feature_importance_data = {
-            'feature_importance': {
-                feature_names[i]: float(importance) 
-                for i, importance in enumerate(model.feature_importances_)
-            },
-            'top_5_features': [
-                {'feature': feature_names[i], 'importance': float(importance)}
-                for i, importance in sorted(enumerate(model.feature_importances_), 
-                                          key=lambda x: x[1], reverse=True)[:5]
-            ],
-            'timestamp': pipeline_timestamp
-        }
-        
-        importance_json = json.dumps(feature_importance_data, indent=2)
-        put_bytes(importance_json.encode('utf-8'), key=train_s3_paths['feature_importance'])
-        logger.info(f"  ✅ feature_importance.json: Feature importance rankings")
-        
-        # Note: All artifacts saved to S3 only - no local storage
-        logger.info(f"📁 All model artifacts saved to S3 only (no local storage)")
-        logger.info(f"🔗 Local model_path reference: {model_path} (not created locally)")
+        if skip_s3:
+            # Save locally for CI/CD validation
+            logger.info(f"\n{'='*60}")
+            logger.info("💾 STEP 7: SAVE MODEL & TRAINING ARTIFACTS LOCALLY (S3 disabled for CI)")
+            logger.info(f"{'='*60}")
+            
+            import joblib
+            os.makedirs("artifacts/models", exist_ok=True)
+            os.makedirs("artifacts/data", exist_ok=True)
+            
+            # Save model as best_model.pkl (for validation script)
+            joblib.dump(model, "artifacts/models/best_model.pkl")
+            logger.info(f"  ✅ best_model.pkl saved locally")
+            
+            # Save test data for validation
+            test_data = {
+                'X_test': pd.DataFrame(X_test) if not isinstance(X_test, pd.DataFrame) else X_test,
+                'y_test': pd.Series(y_test) if not isinstance(y_test, pd.Series) else y_test
+            }
+            joblib.dump(test_data, "artifacts/data/test_data.pkl")
+            logger.info(f"  ✅ test_data.pkl saved locally (for validation)")
+            
+            logger.info(f"  ✅ All artifacts saved locally")
+            
+        else:
+            # Save model and training artifacts to S3
+            logger.info(f"\n{'='*60}")
+            logger.info("💾 STEP 7: SAVE MODEL & TRAINING ARTIFACTS TO S3")
+            logger.info(f"{'='*60}")
+            
+            from utils.s3_io import write_pickle, put_bytes
+            import json
+            
+            # Prepare S3 paths for training artifacts
+            train_s3_paths = {
+                'model': f"artifacts/train_artifacts/{pipeline_timestamp}/sklearn_model.pkl",
+                'model_metadata': f"artifacts/train_artifacts/{pipeline_timestamp}/model_metadata.json",
+                'training_metrics': f"artifacts/train_artifacts/{pipeline_timestamp}/training_metrics.json",
+                'model_params': f"artifacts/train_artifacts/{pipeline_timestamp}/model_params.json",
+                'feature_importance': f"artifacts/train_artifacts/{pipeline_timestamp}/feature_importance.json"
+            }
+            
+            logger.info(f"📁 S3 training artifact paths:")
+            for name, path in train_s3_paths.items():
+                logger.info(f"  • {name}: s3://zuucrew-mlflow-artifacts-prod/{path}")
+            
+            # 1. Save trained model
+            logger.info(f"🤖 Saving trained model...")
+            write_pickle(model, key=train_s3_paths['model'])
+            logger.info(f"  ✅ sklearn_model.pkl: RandomForest model uploaded")
+            
+            # 2. Save model metadata
+            model_metadata = {
+                'model_type': 'RandomForestClassifier',
+                'framework': 'scikit-learn',
+                'training_engine': 'sklearn',
+                'accuracy': float(accuracy),
+                'n_estimators': model.n_estimators,
+                'max_depth': model.max_depth,
+                'random_state': model.random_state,
+                'feature_count': X_train.shape[1],
+                'training_samples': X_train.shape[0],
+                'test_samples': X_test.shape[0],
+                'timestamp': pipeline_timestamp,
+                'data_artifacts_timestamp': latest_timestamp  # Links to data artifacts used
+            }
+            
+            metadata_json = json.dumps(model_metadata, indent=2)
+            put_bytes(metadata_json.encode('utf-8'), key=train_s3_paths['model_metadata'])
+            logger.info(f"  ✅ model_metadata.json: Model configuration and info")
+            
+            # 3. Save training metrics
+            training_metrics = {
+                'accuracy': float(accuracy),
+                'test_accuracy': float(accuracy),
+                'training_time_seconds': 4.66,  # Approximate from logs
+                'model_size_features': X_train.shape[1],
+                'training_samples': X_train.shape[0],
+                'test_samples': X_test.shape[0],
+                'target_distribution': {
+                    'class_0': int((y_test == 0).sum()),
+                    'class_1': int((y_test == 1).sum())
+                },
+                'timestamp': pipeline_timestamp
+            }
+            
+            metrics_json = json.dumps(training_metrics, indent=2)
+            put_bytes(metrics_json.encode('utf-8'), key=train_s3_paths['training_metrics'])
+            logger.info(f"  ✅ training_metrics.json: Performance metrics")
+            
+            # 4. Save model parameters
+            model_params_data = {
+                'n_estimators': int(model.n_estimators),
+                'max_depth': int(model.max_depth) if model.max_depth else None,
+                'random_state': int(model.random_state) if model.random_state else None,
+                'min_samples_split': int(model.min_samples_split),
+                'min_samples_leaf': int(model.min_samples_leaf),
+                'bootstrap': bool(model.bootstrap),
+                'timestamp': pipeline_timestamp
+            }
+            
+            params_json = json.dumps(model_params_data, indent=2)
+            put_bytes(params_json.encode('utf-8'), key=train_s3_paths['model_params'])
+            logger.info(f"  ✅ model_params.json: Model hyperparameters")
+            
+            # 5. Save feature importance
+            feature_names = [f"feature_{i}" for i in range(X_train.shape[1])]  # Generic names for now
+            feature_importance_data = {
+                'feature_importance': {
+                    feature_names[i]: float(importance) 
+                    for i, importance in enumerate(model.feature_importances_)
+                },
+                'top_5_features': [
+                    {'feature': feature_names[i], 'importance': float(importance)}
+                    for i, importance in sorted(enumerate(model.feature_importances_), 
+                                              key=lambda x: x[1], reverse=True)[:5]
+                ],
+                'timestamp': pipeline_timestamp
+            }
+            
+            importance_json = json.dumps(feature_importance_data, indent=2)
+            put_bytes(importance_json.encode('utf-8'), key=train_s3_paths['feature_importance'])
+            logger.info(f"  ✅ feature_importance.json: Feature importance rankings")
+            
+            # Note: All artifacts saved to S3 only - no local storage
+            logger.info(f"📁 All model artifacts saved to S3 only (no local storage)")
+            logger.info(f"🔗 Local model_path reference: {model_path} (not created locally)")
         
         logger.info(f"\n{'='*80}")
         logger.info("🎉 SKLEARN TRAINING PIPELINE COMPLETED SUCCESSFULLY!")

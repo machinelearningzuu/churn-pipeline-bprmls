@@ -97,14 +97,22 @@ jobs:
     - name: Run Data Pipeline (Generate Processed Data)
       run: |
         echo "🔄 Running data preprocessing pipeline..."
+        # Skip S3 uploads in CI (no credentials needed)
+        export SKIP_S3_UPLOAD=true
         python pipelines/data_pipeline.py --engine pandas
         echo "✅ Data pipeline completed"
+      env:
+        SKIP_S3_UPLOAD: "true"
       
     - name: Run Training Pipeline (Generate Model & Test Data)
       run: |
         echo "🎯 Running model training pipeline..."
+        # Skip S3 uploads in CI (no credentials needed)
+        export SKIP_S3_UPLOAD=true
         python pipelines/training_pipeline.py --engine sklearn
         echo "✅ Training pipeline completed"
+      env:
+        SKIP_S3_UPLOAD: "true"
       continue-on-error: false
       
     - name: Validate Model Performance
