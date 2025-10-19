@@ -191,8 +191,20 @@ def data_pipeline(
     
     # Get data path from config if not provided
     if data_path is None:
-        data_path = config['data_paths']['raw_data']
-        logger.info(f"📁 Using data path from config: {data_path}")
+        # Use new data.raw_data_file config (or fallback to legacy data_paths.raw_data)
+        if 'data' in config and 'raw_data_file' in config['data']:
+            raw_file = config['data']['raw_data_file']
+            data_path = f"data/raw/{raw_file}"
+            logger.info(f"📁 Using data file from config: {raw_file}")
+        elif 'data_paths' in config and 'raw_data' in config['data_paths']:
+            data_path = config['data_paths']['raw_data']
+            logger.info(f"📁 Using data path from config (legacy): {data_path}")
+        else:
+            # Fallback to default
+            data_path = "data/raw/ChurnModelling.csv"
+            logger.warning(f"⚠️  No data config found, using default: {data_path}")
+        
+        logger.info(f"📁 Final data path: {data_path}")
     
     # Generate single timestamp for entire pipeline run
     from datetime import datetime
