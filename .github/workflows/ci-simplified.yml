@@ -47,7 +47,10 @@ jobs:
         
     - name: Run Data Validation
       run: |
-        if [ -f "data/raw/ChurnModelling.csv" ]; then
+        # Use the clean dataset (configured in config.yaml)
+        if [ -f "data/raw/ChurnModelling_Clean.csv" ]; then
+          python tests/validate_data.py data/raw/ChurnModelling_Clean.csv
+        elif [ -f "data/raw/ChurnModelling.csv" ]; then
           python tests/validate_data.py data/raw/ChurnModelling.csv
         else
           echo "⚠️  Dataset not available. Skipping validation."
