@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import argparse
+from datetime import datetime
 import pandas as pd
 import numpy as np
 from data_pipeline import data_pipeline
