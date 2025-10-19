@@ -9,7 +9,7 @@ This script runs after data and training pipelines generate artifacts.
 import os
 import sys
 import json
-import pickle
+import joblib
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -70,13 +70,11 @@ def load_artifacts():
     
     # Load model
     print(f"   ✅ Loading model: {model_path}")
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
+    model = joblib.load(model_path)
     
     # Load test data
     print(f"   ✅ Loading test data: {test_data_path}")
-    with open(test_data_path, 'rb') as f:
-        test_data = pickle.load(f)
+    test_data = joblib.load(test_data_path)
     
     return model, test_data
 
