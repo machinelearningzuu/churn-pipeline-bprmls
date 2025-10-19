@@ -328,6 +328,9 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
             
             logger.info(f"  ✅ All artifacts saved locally")
             
+            # Set to None for return statement
+            train_s3_paths = None
+            
         else:
             # Save model and training artifacts to S3
             logger.info(f"\n{'='*60}")
