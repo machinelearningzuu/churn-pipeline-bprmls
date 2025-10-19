@@ -198,38 +198,6 @@ ORDER BY churn_rate DESC;
 
 COMMENT ON VIEW v_geography_churn IS 'Geography-wise churn analysis for last 30 days';
 
--- View 4: Time Series for Trend Analysis
-CREATE OR REPLACE VIEW v_churn_trends AS
-SELECT 
-    DATE(predicted_at) as date,
-    DATE_TRUNC('hour', predicted_at) as hour,
-    COUNT(*) as predictions,
-    SUM(prediction) as churns,
-    ROUND((SUM(prediction)::float / COUNT(*)::float * 100)::numeric, 2) as churn_rate,
-    ROUND(AVG(risk_score)::numeric, 3) as avg_risk
-FROM churn_predictions
-WHERE predicted_at >= NOW() - INTERVAL '90 days'
-GROUP BY DATE(predicted_at), DATE_TRUNC('hour', predicted_at)
-ORDER BY date DESC, hour DESC;
-
-COMMENT ON VIEW v_churn_trends IS 'Hourly churn trends for last 90 days';
-
--- View 5: Model Performance Metrics
-CREATE OR REPLACE VIEW v_model_performance AS
-SELECT 
-    model_version,
-    DATE(predicted_at) as date,
-    COUNT(*) as total_predictions,
-    ROUND(AVG(probability)::numeric, 3) as avg_confidence,
-    SUM(CASE WHEN probability >= 0.8 THEN 1 ELSE 0 END) as high_confidence_count,
-    SUM(CASE WHEN probability < 0.6 THEN 1 ELSE 0 END) as low_confidence_count
-FROM churn_predictions
-WHERE predicted_at >= NOW() - INTERVAL '30 days'
-GROUP BY model_version, DATE(predicted_at)
-ORDER BY date DESC, model_version;
-
-COMMENT ON VIEW v_model_performance IS 'Model confidence metrics for last 30 days';
-
 -- ==========================================
 -- DATA RETENTION POLICY (Optional)
 -- ==========================================
