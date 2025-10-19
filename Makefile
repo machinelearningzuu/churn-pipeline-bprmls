@@ -817,10 +817,10 @@ pause-streaming:
 	@docker stop kafka-consumer 2>/dev/null && echo "   ✅ Consumer stopped" || echo "   ⚠️  Consumer not running"
 	@echo ""
 	@echo "2️⃣ Pausing Airflow DAGs..."
-	@docker exec airflow-webserver airflow dags pause data_pipeline_dag 2>/dev/null && \
-		echo "   ✅ data_pipeline_dag paused" || echo "   ⚠️  data_pipeline_dag not found"
-	@docker exec airflow-webserver airflow dags pause model_training_dag 2>/dev/null && \
-		echo "   ✅ model_training_dag paused" || echo "   ⚠️  model_training_dag not found"
+	@docker exec airflow-webserver airflow dags pause data_pipeline_every_20m 2>/dev/null && \
+		echo "   ✅ data_pipeline_every_20m paused" || echo "   ⚠️  data_pipeline_every_20m not found"
+	@docker exec airflow-webserver airflow dags pause train_pipeline_every_60m 2>/dev/null && \
+		echo "   ✅ train_pipeline_every_60m paused" || echo "   ⚠️  train_pipeline_every_60m not found"
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "✅ STREAMING & TRAINING PAUSED"
@@ -847,10 +847,10 @@ resume-streaming:
 	@docker start kafka-consumer 2>/dev/null && echo "   ✅ Consumer started" || echo "   ⚠️  Consumer failed to start"
 	@echo ""
 	@echo "2️⃣ Resuming Airflow DAGs..."
-	@docker exec airflow-webserver airflow dags unpause data_pipeline_dag 2>/dev/null && \
-		echo "   ✅ data_pipeline_dag resumed" || echo "   ⚠️  data_pipeline_dag not found"
-	@docker exec airflow-webserver airflow dags unpause model_training_dag 2>/dev/null && \
-		echo "   ✅ model_training_dag resumed" || echo "   ⚠️  model_training_dag not found"
+	@docker exec airflow-webserver airflow dags unpause data_pipeline_every_20m 2>/dev/null && \
+		echo "   ✅ data_pipeline_every_20m resumed" || echo "   ⚠️  data_pipeline_every_20m not found"
+	@docker exec airflow-webserver airflow dags unpause train_pipeline_every_60m 2>/dev/null && \
+		echo "   ✅ train_pipeline_every_60m resumed" || echo "   ⚠️  train_pipeline_every_60m not found"
 	@echo ""
 	@echo "⏳ Waiting for services to initialize..."
 	@sleep 5

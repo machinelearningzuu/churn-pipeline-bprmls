@@ -158,6 +158,7 @@ terraform.tfstate.backup
 # Redundant Documentation (Keep only essential docs)
 # ==========================================
 # Archive/backup documentation
+docs-capstone/*
 docs/ECS_*.md
 docs/AWS_ECS_*.md
 docs/DEPLOYMENT_*.md

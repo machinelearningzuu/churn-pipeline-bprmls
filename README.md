@@ -9,6 +9,20 @@ A complete, production-grade machine learning system for predicting customer chu
 
 ---
 
+## 🎓 Comprehensive Documentation
+
+**NEW! 📚 Detailed end-to-end guides for the complete system:**
+
+| Guide | Description | Read Time |
+|-------|-------------|-----------|
+| [📖 Kafka Integration](docs-capstone/01_KAFKA_INTEGRATION.md) | Real-time streaming with Kafka, Docker setup, producer/consumer services | 30 min |
+| [🔄 CI/CD Configuration](docs-capstone/02_CICD_CONFIGURATION.md) | GitHub Actions, data/model validation, automated testing | 25 min |
+| [📊 Analytics & QuickSight](docs-capstone/03_ANALYTICS_QUICKSIGHT.md) | RDS setup, SQL views, QuickSight dashboards, visualizations | 35 min |
+
+**📂 [Browse all capstone documentation →](docs-capstone/)**
+
+---
+
 ## 📋 Table of Contents
 
 1. [Overview](#overview)
@@ -829,11 +843,22 @@ Then create a pull request on GitHub.
 
 ## 📚 Additional Resources
 
-### Documentation
+### 🎓 Comprehensive Capstone Documentation
+
+**Complete end-to-end guides (recommended for students):**
+
+- 📖 **[Kafka Integration Guide](docs-capstone/01_KAFKA_INTEGRATION.md)** - Full Kafka setup, Docker, producer/consumer, troubleshooting
+- 🔄 **[CI/CD Configuration Guide](docs-capstone/02_CICD_CONFIGURATION.md)** - Complete GitHub Actions, validation pipelines, testing
+- 📊 **[Analytics & QuickSight Guide](docs-capstone/03_ANALYTICS_QUICKSIGHT.md)** - RDS, SQL views, dashboards, visualizations
+- 📂 **[All Capstone Docs](docs-capstone/)** - Browse complete documentation folder
+
+### Quick Reference Documentation
 
 - 📖 [Startup Guide](docs/STARTUP_GUIDE.md) - Detailed setup instructions
 - 📖 [Kafka Quick Start](docs/KAFKA_QUICKSTART.md) - Kafka streaming guide
 - 📖 [CI/CD Guide](docs/CI_CD_SIMPLIFIED_SUMMARY.md) - CI/CD documentation
+- 📖 [AWS QuickSight Dashboards](docs/AWS_QUICKSIGHT_GUIDE.md) - Build interactive BI dashboards
+- 📊 [QuickSight Calculated Fields](docs/QUICKSIGHT_CALCULATED_FIELDS.md) - SQL formulas & functions reference
 - 📖 [Project Structure](docs/project_structure.md) - Architecture details
 
 ### External Links
