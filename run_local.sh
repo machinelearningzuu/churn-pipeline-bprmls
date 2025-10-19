@@ -42,7 +42,7 @@ NC='\033[0m' # No Color
 
 # Set environment variables
 export MLFLOW_TRACKING_URI="http://localhost:5001"
-export MLFLOW_DEFAULT_ARTIFACT_ROOT="s3://zuucrew-mlflow-artifacts-prod/artifacts/mlflow-artifacts"
+export MLFLOW_DEFAULT_ARTIFACT_ROOT="s3://${S3_BUCKET}/artifacts/mlflow-artifacts"
 export PYTHONPATH="."
 export AWS_PROFILE="${AWS_PROFILE:-default}"
 

@@ -573,8 +573,9 @@ def _run_pandas_pipeline(data_path, target_column, test_size, force_rebuild, out
             }
             
             logger.info(f"📁 S3 artifact paths:")
+            s3_bucket = os.getenv('S3_BUCKET', 'your-bucket-name')
             for name, path in s3_paths.items():
-                logger.info(f"  • {name}: s3://zuucrew-mlflow-artifacts-prod/{path}")
+                logger.info(f"  • {name}: s3://{s3_bucket}/{path}")
             
             # Save datasets to S3
             datasets = {
@@ -620,7 +621,7 @@ def _run_pandas_pipeline(data_path, target_column, test_size, force_rebuild, out
                 logger.info(f"  ✅ {col.lower()}_encoder.json: {col} one-hot encoder mapping")
                 logger.info(f"    • Categories: {encoder_data['categories']}")
                 logger.info(f"    • Binary columns: {encoder_data['binary_columns']}")
-                logger.info(f"    • File: s3://zuucrew-mlflow-artifacts-prod/{s3_key}")
+                logger.info(f"    • File: s3://{s3_bucket}/{s3_key}")
             
             # 3. Save scaler with metadata
             logger.info(f"📏 Saving feature scaler with metadata...")
@@ -687,7 +688,8 @@ def _run_pandas_pipeline(data_path, target_column, test_size, force_rebuild, out
         logger.info(f"  • Test set: {len(X_test):,} samples")
         logger.info(f"  • Features: {X_train.shape[1]} columns")
         logger.info(f"  • Target: {target_column}")
-        logger.info(f"📁 S3 artifacts: s3://zuucrew-mlflow-artifacts-prod/artifacts/data_artifacts/{pipeline_timestamp}/")
+        s3_bucket_final = os.getenv('S3_BUCKET', 'your-bucket-name')
+        logger.info(f"📁 S3 artifacts: s3://{s3_bucket_final}/artifacts/data_artifacts/{pipeline_timestamp}/")
         logger.info(f"🔧 Preprocessing artifacts:")
         logger.info(f"  • geography_encoder.json: {len(encoders.get('Geography', {}).get('categories', []))} categories (one-hot)")
         logger.info(f"  • gender_encoder.json: {len(encoders.get('Gender', {}).get('categories', []))} categories (one-hot)") 

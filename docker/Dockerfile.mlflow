@@ -34,7 +34,7 @@ USER appuser
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     MLFLOW_BACKEND_STORE_URI=file:///tmp/mlruns \
-    MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://\${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}/mlflow-artifacts \
+    MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://\${S3_BUCKET}/mlflow-artifacts \
     GIT_PYTHON_REFRESH=quiet
 
 # Expose MLflow port

@@ -186,7 +186,8 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
                 logger.info(f"  • X_test: {X_test.shape[0]:,} rows × {X_test.shape[1]} features")
                 logger.info(f"  • y_train: {len(y_train):,} samples")
                 logger.info(f"  • y_test: {len(y_test):,} samples")
-                logger.info(f"  • Source: s3://zuucrew-mlflow-artifacts-prod/{data_artifact_base}/")
+                s3_bucket = os.getenv('S3_BUCKET', 'your-bucket-name')
+                logger.info(f"  • Source: s3://{s3_bucket}/{data_artifact_base}/")
                 
                 # Convert to numpy arrays for sklearn compatibility
                 X_train = X_train.values
@@ -351,8 +352,9 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
             }
             
             logger.info(f"📁 S3 training artifact paths:")
+            s3_bucket_train = os.getenv('S3_BUCKET', 'your-bucket-name')
             for name, path in train_s3_paths.items():
-                logger.info(f"  • {name}: s3://zuucrew-mlflow-artifacts-prod/{path}")
+                logger.info(f"  • {name}: s3://{s3_bucket_train}/{path}")
             
             # 1. Save trained model
             logger.info(f"🤖 Saving trained model...")
@@ -444,7 +446,8 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
         logger.info(f"  • Training samples: {X_train.shape[0]:,}")
         logger.info(f"  • Test samples: {X_test.shape[0]:,}")
         logger.info(f"  • Features: {X_train.shape[1]} columns")
-        logger.info(f"📁 S3 training artifacts: s3://zuucrew-mlflow-artifacts-prod/artifacts/train_artifacts/{pipeline_timestamp}/")
+        s3_bucket_final = os.getenv('S3_BUCKET', 'your-bucket-name')
+        logger.info(f"📁 S3 training artifacts: s3://{s3_bucket_final}/artifacts/train_artifacts/{pipeline_timestamp}/")
         logger.info(f"🔧 Training artifacts:")
         logger.info(f"  • sklearn_model.pkl: Trained RandomForest model")
         logger.info(f"  • model_metadata.json: Model configuration")

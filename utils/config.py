@@ -1,6 +1,7 @@
 import os
 import yaml
 import logging
+import re
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
@@ -13,10 +14,31 @@ CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)),
     'config.yaml')
 
 
+def _substitute_env_vars(config: Any) -> Any:
+    """
+    Recursively substitute environment variables in config.
+    Supports ${VAR_NAME} syntax.
+    """
+    if isinstance(config, dict):
+        return {key: _substitute_env_vars(value) for key, value in config.items()}
+    elif isinstance(config, list):
+        return [_substitute_env_vars(item) for item in config]
+    elif isinstance(config, str):
+        # Find all ${VAR_NAME} patterns
+        def replacer(match):
+            var_name = match.group(1)
+            return os.environ.get(var_name, match.group(0))
+        return re.sub(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}', replacer, config)
+    else:
+        return config
+
+
 def load_config():
     try:
         with open(CONFIG_FILE, 'r') as f:
             config = yaml.safe_load(f)
+        # Substitute environment variables
+        config = _substitute_env_vars(config)
         return config
     except Exception as e:
         logger.error(f'Error loading configuration: {e}')
@@ -127,7 +149,9 @@ def get_raw_data_path() -> str:
     
     # Get configurable file name (default to original)
     raw_data_file = data_config.get('raw_data_file', 'ChurnModelling.csv')
-    s3_bucket = data_config.get('s3_bucket', 'zuucrew-mlflow-artifacts-prod')
+    s3_bucket = data_config.get('s3_bucket') or os.getenv('S3_BUCKET')
+    if not s3_bucket:
+        raise ValueError("S3_BUCKET must be set in .env file or config.yaml")
     s3_prefix = data_config.get('s3_prefix', 'data/raw')
     
     # Construct full S3 path

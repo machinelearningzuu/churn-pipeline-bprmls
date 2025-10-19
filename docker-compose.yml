@@ -24,7 +24,7 @@ services:
       # LOCAL: SQLite Backend Store (file-based, no external DB needed)
       - MLFLOW_BACKEND_STORE_URI=sqlite:///mlflow/mlflow.db
       # LOCAL: S3 for artifacts (still uses AWS S3)
-      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}/artifacts/mlflow-artifacts
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${S3_BUCKET}/artifacts/mlflow-artifacts
     volumes:
       - ~/.aws:/aws:ro
       - mlflow-db:/mlflow
@@ -61,7 +61,7 @@ services:
       - AWS_SHARED_CREDENTIALS_FILE=/aws/credentials
       - AWS_CONFIG_FILE=/aws/config
       - AWS_PROFILE=${AWS_PROFILE:-default}
-      - S3_BUCKET=${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}
+      - S3_BUCKET=${S3_BUCKET}
       - MLFLOW_TRACKING_URI=http://mlflow-tracking:5001
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
@@ -97,7 +97,7 @@ services:
       - AWS_SHARED_CREDENTIALS_FILE=/aws/credentials
       - AWS_CONFIG_FILE=/aws/config
       - AWS_PROFILE=${AWS_PROFILE:-default}
-      - S3_BUCKET=${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}
+      - S3_BUCKET=${S3_BUCKET}
       - MLFLOW_TRACKING_URI=http://mlflow-tracking:5001
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
@@ -133,7 +133,7 @@ services:
       - AWS_SHARED_CREDENTIALS_FILE=/aws/credentials
       - AWS_CONFIG_FILE=/aws/config
       - AWS_PROFILE=${AWS_PROFILE:-default}
-      - S3_BUCKET=${S3_BUCKET:-zuucrew-mlflow-artifacts-prod}
+      - S3_BUCKET=${S3_BUCKET}
       - MLFLOW_TRACKING_URI=http://mlflow-tracking:5001
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1

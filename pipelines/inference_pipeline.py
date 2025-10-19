@@ -498,8 +498,9 @@ def run_pandas_inference(model_timestamp=None):
         }
         
         logger.info(f"📁 S3 inference artifact paths:")
+        s3_bucket_inf = os.getenv('S3_BUCKET', 'your-bucket-name')
         for name, path in inference_s3_paths.items():
-            logger.info(f"  • {name}: s3://zuucrew-mlflow-artifacts-prod/{path}")
+            logger.info(f"  • {name}: s3://{s3_bucket_inf}/{path}")
         
         # Save predictions
         write_df_csv(inference_results, key=inference_s3_paths['predictions'])
@@ -661,7 +662,8 @@ def run_pandas_inference(model_timestamp=None):
         logger.info(f"  • Total predictions: {len(y_pred):,}")
         logger.info(f"  • Model used: {model_timestamp}")
         logger.info(f"  • Data used: {data_timestamp}")
-        logger.info(f"📁 S3 inference artifacts: s3://zuucrew-mlflow-artifacts-prod/artifacts/inference_artifacts/{inference_timestamp}/")
+        s3_bucket_final = os.getenv('S3_BUCKET', 'your-bucket-name')
+        logger.info(f"📁 S3 inference artifacts: s3://{s3_bucket_final}/artifacts/inference_artifacts/{inference_timestamp}/")
         logger.info(f"🎯 Engine used: Pandas + Scikit-learn (fast, efficient)")
         logger.info(f"{'='*80}")
         

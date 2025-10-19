@@ -75,6 +75,7 @@ services:
   # PRODUCER SERVICE
   # ==========================================
   producer:
+    image: kafka/ml-pipeline-producer:latest
     build:
       context: .
       dockerfile: docker/Dockerfile.kafka-producer
@@ -83,6 +84,9 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: customer-events
       RUNNING_IN_DOCKER: 'true'
+      
+      # S3 Configuration
+      S3_BUCKET: ${S3_BUCKET}
     depends_on:
       kafka:
         condition: service_healthy
@@ -97,6 +101,7 @@ services:
   # CONSUMER SERVICE (INFERENCE ENGINE)
   # ==========================================
   consumer:
+    image: kafka/ml-pipeline-consumer:latest
     build:
       context: .
       dockerfile: docker/Dockerfile.kafka-consumer
@@ -111,6 +116,7 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-south-1}
+      S3_BUCKET: ${S3_BUCKET}
       
       # MLflow
       MLFLOW_TRACKING_URI: http://mlflow:5001
@@ -137,6 +143,7 @@ services:
   # ANALYTICS SERVICE (RDS Writer)
   # ==========================================
   analytics:
+    image: kafka/ml-pipeline-analytics:latest
     build:
       context: .
       dockerfile: docker/Dockerfile.kafka-analytics
@@ -144,6 +151,9 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       RUNNING_IN_DOCKER: 'true'
+      
+      # S3 Configuration
+      S3_BUCKET: ${S3_BUCKET}
       
       # RDS database
       RDS_HOST: ${RDS_HOST}

@@ -6,11 +6,11 @@ processing:
   inference_engine: "pandas"  # Inference with pandas (faster for single predictions)
   fallback_to_pyspark: true  # Allow fallback to PySpark for large datasets
 
-# AWS S3 Configuration
+# AWS S3 Configuration (uses environment variables from .env)
 aws:
-  region: "ap-south-1"  # Change this to your AWS region
-  s3_bucket: "zuucrew-mlflow-artifacts-prod"  # Change this to your S3 bucket name  
-  s3_kms_key_arn: "arn:aws:kms:ap-south-1:899013845787:key/e89689e5-326c-486f-846d-63061b1af579"  # Change this to your KMS key
+  region: "${AWS_DEFAULT_REGION}"  # Read from .env: AWS_DEFAULT_REGION
+  s3_bucket: "${S3_BUCKET}"  # Read from .env: S3_BUCKET
+  s3_kms_key_arn: "${S3_KMS_KEY_ARN}"  # Read from .env: S3_KMS_KEY_ARN (optional)
   force_s3_io: true  # Always use S3 for all storage
 
 # MLflow Configuration
@@ -20,10 +20,10 @@ mlflow:
   local_tracking_uri: "http://localhost:5001"           # Local MLflow server
   docker_tracking_uri: "http://mlflow-tracking:5001"    # Dockerized MLflow server
   experiment_name: "Churn Analysis"
-  artifact_root: "s3://zuucrew-mlflow-artifacts-prod/artifacts/mlflow-artifacts"
+  artifact_root: "s3://${S3_BUCKET}/artifacts/mlflow-artifacts"  # Uses S3_BUCKET from .env
   # S3-based tracking backend (instead of local files)
   s3_tracking_backend: true
-  s3_tracking_bucket: "zuucrew-mlflow-artifacts-prod"
+  s3_tracking_bucket: "${S3_BUCKET}"  # Uses S3_BUCKET from .env
   s3_tracking_prefix: "artifacts/mlflow-tracking"
   model_registry_name: "churn_prediction"
   artifact_path: "model"
@@ -44,8 +44,8 @@ data:
   # - "ChurnModelling_Clean.csv" (imputed Gender values - validation will PASS)
   raw_data_file: "ChurnModelling_Clean.csv"  # Change to test validation pass/fail
   
-  # S3 bucket for data storage
-  s3_bucket: "zuucrew-mlflow-artifacts-prod"
+  # S3 bucket for data storage (uses S3_BUCKET from .env)
+  s3_bucket: "${S3_BUCKET}"
   s3_prefix: "data/raw"
 
 data_paths:

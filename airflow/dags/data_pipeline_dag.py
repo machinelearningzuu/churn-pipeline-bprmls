@@ -59,7 +59,7 @@ with DAG(
                     "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
                     "AWS_REGION": os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
                     "AWS_DEFAULT_REGION": os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
-                    "S3_BUCKET": "zuucrew-mlflow-artifacts-prod",
+                    "S3_BUCKET": os.getenv("S3_BUCKET"),
                     "MLFLOW_TRACKING_URI": "http://mlflow-tracking:5001",
                     "CONTAINERIZED": "true"
                     },

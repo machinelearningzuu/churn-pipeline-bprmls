@@ -1,0 +1,292 @@
+# ==========================================
+# ML PIPELINE CONFIGURATION (EXAMPLE)
+# ==========================================
+# Copy this file to config.yaml and update with your values:
+#   cp config.example.yaml config.yaml
+#
+# Then update .env file with your AWS credentials:
+#   AWS_ACCESS_KEY_ID=your_key
+#   AWS_SECRET_ACCESS_KEY=your_secret
+#   AWS_DEFAULT_REGION=your_region
+#   S3_BUCKET=your-bucket-name
+#   RDS_HOST=your-rds-endpoint.rds.amazonaws.com
+#   RDS_USERNAME=your_username
+#   RDS_PASSWORD=your_password
+# ==========================================
+
+# Processing Engine Configuration (prioritize pandas/scikit-learn)
+processing:
+  default_engine: "pandas"  # "pandas" or "pyspark" - pandas prioritized for faster processing
+  data_processing_engine: "pandas"  # Data preprocessing with pandas
+  model_training_engine: "sklearn"  # Model training with scikit-learn
+  inference_engine: "pandas"  # Inference with pandas (faster for single predictions)
+  fallback_to_pyspark: true  # Allow fallback to PySpark for large datasets
+
+# AWS S3 Configuration
+# Note: Bucket name and region should be set in .env file
+aws:
+  region: "${AWS_DEFAULT_REGION}"  # Read from .env: AWS_DEFAULT_REGION
+  s3_bucket: "${S3_BUCKET}"  # Read from .env: S3_BUCKET
+  s3_kms_key_arn: "${S3_KMS_KEY_ARN}"  # Optional: Your KMS key ARN
+  force_s3_io: true  # Always use S3 for all storage
+
+# MLflow Configuration
+mlflow:
+  # MLflow URLs - automatically selected based on CONTAINERIZED environment variable
+  local_tracking_uri: "http://localhost:5001"           # Local MLflow server
+  docker_tracking_uri: "http://mlflow-tracking:5001"    # Dockerized MLflow server
+  experiment_name: "Churn Analysis"  # Change to your experiment name
+  artifact_root: "s3://${S3_BUCKET}/artifacts/mlflow-artifacts"  # Uses S3_BUCKET from .env
+  # S3-based tracking backend (instead of local files)
+  s3_tracking_backend: true
+  s3_tracking_bucket: "${S3_BUCKET}"  # Uses S3_BUCKET from .env
+  s3_tracking_prefix: "artifacts/mlflow-tracking"
+  model_registry_name: "churn_prediction"
+  artifact_path: "model"
+  run_name_prefix: "churn_run"
+  tags:
+    project: "customer_churn_prediction"
+    team: "ml_engineering"
+    environment: "development"
+  autolog: true
+
+# ==========================================
+# Data Configuration
+# ==========================================
+# Choose which dataset to use for experiments
+data:
+  # Available options:
+  # - "ChurnModelling.csv" (original with missing values - validation will FAIL)
+  # - "ChurnModelling_Clean.csv" (imputed Gender values - validation will PASS)
+  raw_data_file: "ChurnModelling_Clean.csv"  # Change to test validation pass/fail
+  
+  # S3 bucket for data storage (uses S3_BUCKET from .env)
+  s3_bucket: "${S3_BUCKET}"
+  s3_prefix: "data/raw"
+
+data_paths:
+  # raw_data is now constructed dynamically from data.raw_data_file
+  processed_data: "data/processed/ChurnModelling_Missing_Values_Handled.csv"
+  imputed_data: "data/processed/imputed.csv"
+  processed_dir: "data/processed"
+  artifacts_dir: "artifacts"
+  data_artifacts_dir: "artifacts/data"
+  train_artifacts_dir: "artifacts/train_artifacts"
+  X_train: "artifacts/data/X_train.csv"
+  X_test: "artifacts/data/X_test.csv"
+  Y_train: "artifacts/data/Y_train.csv"
+  Y_test: "artifacts/data/Y_test.csv"
+
+columns:
+  target: "Exited"
+  drop_columns: ["CustomerId", "RowNumber", "Surname"]
+  critical_columns: ["Firstname"]
+  outlier_columns: ["CreditScore", "Age", "NumOfProducts"]
+  nominal_columns: ["Geography", "Gender"]
+  numeric_columns: ["Balance", "EstimatedSalary"]
+  feature_columns:
+    - "CreditScore"
+    - "Geography"
+    - "Gender"
+    - "Age"
+    - "Tenure"
+    - "Balance"
+    - "NumOfProducts"
+    - "HasCrCard"
+    - "IsActiveMember"
+    - "EstimatedSalary"
+
+# Data Validation
+data_validation:
+  min_rows: 1000
+  max_missing_percent: 5.0
+  outlier_threshold: 3.0
+  allowed_categorical_values:
+    Geography: ["France", "Germany", "Spain"]
+    Gender: ["Male", "Female"]
+
+# Missing Values Handling
+missing_values:
+  strategy: "mean"  # 'mean', 'median', 'mode'
+  numeric_strategy: "mean"
+  categorical_strategy: "mode"
+
+# Binning Configuration
+binning:
+  age:
+    bins: [0, 30, 40, 50, 100]
+    labels: ["Young", "Middle", "Senior", "Elder"]
+  balance:
+    bins: [0, 50000, 100000, 150000, 250000]
+    labels: ["Low", "Medium", "High", "Very High"]
+
+# Feature Scaling
+scaling:
+  method: "standard"  # 'standard', 'minmax', 'robust'
+  columns_to_scale:
+    - "CreditScore"
+    - "Age"
+    - "Tenure"
+    - "Balance"
+    - "NumOfProducts"
+    - "EstimatedSalary"
+
+# Feature Encoding
+encoding:
+  method: "onehot"  # 'onehot', 'label'
+  categorical_columns:
+    - "Geography"
+    - "Gender"
+
+# Outlier Detection
+outlier_detection:
+  method: "zscore"  # 'zscore', 'iqr'
+  threshold: 3.0
+  columns:
+    - "CreditScore"
+    - "Age"
+    - "Balance"
+    - "NumOfProducts"
+    - "EstimatedSalary"
+
+# Model Training Configuration
+model_training:
+  test_size: 0.2
+  random_state: 42
+  validation_split: 0.2
+  n_jobs: -1
+  
+  # Model types to train
+  models:
+    - "logistic_regression"
+    - "random_forest"
+    - "gradient_boosting"
+    - "xgboost"
+  
+  # Hyperparameters
+  hyperparameters:
+    logistic_regression:
+      C: [0.01, 0.1, 1, 10]
+      max_iter: [1000]
+      solver: ['lbfgs']
+    
+    random_forest:
+      n_estimators: [100, 200]
+      max_depth: [10, 20, None]
+      min_samples_split: [2, 5]
+      min_samples_leaf: [1, 2]
+    
+    gradient_boosting:
+      n_estimators: [100, 200]
+      learning_rate: [0.01, 0.1]
+      max_depth: [3, 5]
+    
+    xgboost:
+      n_estimators: [100, 200]
+      learning_rate: [0.01, 0.1]
+      max_depth: [3, 5, 7]
+      subsample: [0.8, 1.0]
+
+# Model Evaluation
+model_evaluation:
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+    - "roc_auc"
+  
+  cv_folds: 5
+  scoring: "f1"
+
+# Model Validation (for CI/CD)
+model_validation:
+  performance_thresholds:
+    accuracy: 0.75  # Model must achieve at least 75% accuracy
+    # precision: 0.70  # Commented out - not required for deployment
+    # recall: 0.70     # Commented out - not required for deployment
+    # f1_score: 0.70   # Commented out - not required for deployment
+
+# Model Inference
+inference:
+  batch_size: 1000
+  timeout_seconds: 60
+
+# Kafka Configuration
+kafka:
+  bootstrap_servers: "${KAFKA_BOOTSTRAP_SERVERS}"  # Read from .env
+  topics:
+    customer_events: "customer-events"
+    predictions: "predictions"
+  
+  producer:
+    client_id: "churn-producer"
+    acks: "all"
+    retries: 3
+    compression_type: "gzip"
+  
+  consumer:
+    group_id: "churn-consumer-group"
+    auto_offset_reset: "earliest"
+    enable_auto_commit: true
+    max_poll_records: 1000
+
+# Analytics Configuration
+analytics:
+  database:
+    host: "${RDS_HOST}"      # Read from .env
+    port: "${RDS_PORT}"      # Read from .env
+    name: "${RDS_DB_NAME}"   # Read from .env
+    user: "${RDS_USERNAME}"  # Read from .env
+    password: "${RDS_PASSWORD}"  # Read from .env
+    sslmode: "require"
+  
+  tables:
+    predictions: "churn_predictions"
+    metrics: "churn_prediction_metrics"
+    errors: "prediction_errors"
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/pipeline.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# Monitoring
+monitoring:
+  enable_metrics: true
+  metrics_port: 9090
+  health_check_interval: 60
+
+# Feature Store (Optional)
+feature_store:
+  enabled: false
+  backend: "s3"  # 's3', 'dynamodb', 'redis'
+  ttl: 86400  # 24 hours
+
+# Experiment Tracking
+experiment_tracking:
+  track_hyperparameters: true
+  track_metrics: true
+  track_artifacts: true
+  track_models: true
+  log_system_metrics: true
+  log_git_commit: true
+
+# Notifications (Optional)
+notifications:
+  enabled: false
+  slack_webhook: ""
+  email_recipients: []
+
+# Advanced Settings
+advanced:
+  enable_caching: true
+  cache_ttl: 3600
+  parallel_processing: true
+  max_workers: 4
+  memory_limit_gb: 8
+  enable_gpu: false
+

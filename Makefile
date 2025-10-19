@@ -183,13 +183,14 @@ s3-clean:
 	@read -p "Continue? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
 	@echo ""
 	@echo "🗑️ Deleting data artifacts..."
-	@aws s3 rm s3://zuucrew-mlflow-artifacts-prod/artifacts/data_artifacts/ --recursive 2>/dev/null || echo "No data artifacts found"
+	@if [ -z "$$S3_BUCKET" ]; then echo "❌ S3_BUCKET not set in .env"; exit 1; fi
+	@aws s3 rm s3://$$S3_BUCKET/artifacts/data_artifacts/ --recursive 2>/dev/null || echo "No data artifacts found"
 	@echo "🗑️ Deleting model artifacts..."
-	@aws s3 rm s3://zuucrew-mlflow-artifacts-prod/artifacts/train_artifacts/ --recursive 2>/dev/null || echo "No training artifacts found"
+	@aws s3 rm s3://$$S3_BUCKET/artifacts/train_artifacts/ --recursive 2>/dev/null || echo "No training artifacts found"
 	@echo "🗑️ Deleting inference artifacts..."
-	@aws s3 rm s3://zuucrew-mlflow-artifacts-prod/artifacts/inference_artifacts/ --recursive 2>/dev/null || echo "No inference artifacts found"
+	@aws s3 rm s3://$$S3_BUCKET/artifacts/inference_artifacts/ --recursive 2>/dev/null || echo "No inference artifacts found"
 	@echo "🗑️ Deleting test artifacts..."
-	@aws s3 rm s3://zuucrew-mlflow-artifacts-prod/test/ --recursive 2>/dev/null || echo "No test artifacts found"
+	@aws s3 rm s3://$$S3_BUCKET/test/ --recursive 2>/dev/null || echo "No test artifacts found"
 	@echo "✅ S3 artifacts cleaned!"
 
 # Remove legacy local artifact folders (since we're S3-only now)
@@ -465,7 +466,8 @@ airflow-reset:
 s3-list:
 	@echo "📋 Listing S3 keys..."
 	@if [ -z "$(PREFIX)" ]; then echo "❌ Usage: make s3-list PREFIX=your-prefix"; exit 1; fi
-	@aws s3 ls s3://zuucrew-mlflow-artifacts-prod/$(PREFIX) --recursive
+	@if [ -z "$$S3_BUCKET" ]; then echo "❌ S3_BUCKET not set in .env"; exit 1; fi
+	@aws s3 ls s3://$$S3_BUCKET/$(PREFIX) --recursive
 
 # Delete specific S3 keys with prefix (use with caution)
 s3-delete-prefix:
@@ -521,8 +523,9 @@ ifneq (,$(wildcard .env))
 endif
 
 # RDS Connection Parameters with fallbacks
-RDS_HOST ?= churn-pipeline-metadata-db.cbqsg4cugpeo.ap-south-1.rds.amazonaws.com
-RDS_USER ?= zuucrew
+# RDS Configuration - load from .env file
+RDS_HOST ?= $(shell grep '^RDS_HOST=' .env 2>/dev/null | cut -d '=' -f2)
+RDS_USER ?= $(shell grep '^RDS_USERNAME=' .env 2>/dev/null | cut -d '=' -f2)
 RDS_PASSWORD ?= churnpipe\#bprmls
 RDS_PORT ?= 5432
 RDS_MLFLOW_DB ?= mlflow
