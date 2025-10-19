@@ -398,6 +398,47 @@ def main():
         sys.exit(1)
 
 
+def test_data_validation():
+    """
+    Pytest-compatible test wrapper for data validation.
+    Validates data/raw/ChurnModelling.csv by default.
+    """
+    import pytest
+    
+    data_path = "data/raw/ChurnModelling.csv"
+    
+    if not os.path.exists(data_path):
+        pytest.skip(f"Data file not found: {data_path}")
+    
+    # Load data
+    df = load_data(data_path)
+    
+    # Run all checks
+    checks = [
+        ('required_columns', check_required_columns),
+        ('data_types', check_data_types),
+        ('value_ranges', check_value_ranges),
+        ('categorical_values', check_categorical_values),
+        ('missing_values', check_missing_values),
+        ('duplicates', check_duplicates),
+        ('data_drift', lambda df: check_data_drift(df, None)),
+        ('class_balance', check_class_balance)
+    ]
+    
+    failed_checks = []
+    for check_name, check_func in checks:
+        passed = check_func(df)
+        if not passed:
+            failed_checks.append(check_name)
+    
+    # Assert all checks passed
+    if failed_checks:
+        error_msg = f"Data validation failed for the following checks:\n"
+        for check in failed_checks:
+            error_msg += f"  - {check}\n"
+        pytest.fail(error_msg)
+
+
 if __name__ == "__main__":
     main()
 

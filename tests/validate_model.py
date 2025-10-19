@@ -317,6 +317,46 @@ def main():
         sys.exit(1)
 
 
+def test_model_validation():
+    """
+    Pytest-compatible test wrapper for model validation.
+    Validates artifacts/models/best_model.pkl by default.
+    """
+    import pytest
+    
+    # Default paths
+    model_path = "artifacts/models/best_model.pkl"
+    test_data_path = "artifacts/data/test_data.pkl"
+    
+    # Skip if artifacts don't exist (no model trained yet)
+    if not os.path.exists(model_path) or not os.path.exists(test_data_path):
+        pytest.skip(f"Model artifacts not found. Train a model first.\n"
+                   f"  Model: {model_path}\n"
+                   f"  Test data: {test_data_path}")
+    
+    # Load and validate
+    model = load_model(model_path)
+    test_data = load_test_data(test_data_path)
+    X_test = test_data['X_test']
+    y_test = test_data['y_test']
+    
+    # Make predictions and calculate metrics
+    y_pred = predict(model, X_test)
+    metrics = calculate_metrics(y_test, y_pred)
+    
+    # Check thresholds
+    threshold_results = check_thresholds(metrics)
+    
+    # Assert model passes all thresholds
+    if not threshold_results['all_passed']:
+        failed_metrics = [k for k, v in threshold_results.items() 
+                         if k != 'all_passed' and not v['passed']]
+        error_msg = f"Model validation failed:\n"
+        error_msg += f"  F1 Score: {metrics['f1_score']:.2%} < {THRESHOLDS['f1_score']:.2%}\n"
+        error_msg += f"  Failed metrics: {', '.join(failed_metrics)}\n"
+        pytest.fail(error_msg)
+
+
 if __name__ == "__main__":
     main()
 
