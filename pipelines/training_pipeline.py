@@ -109,65 +109,100 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
         import joblib
         import numpy as np
         
-        # Load latest processed data from S3 data_artifacts
-        logger.info("📥 Loading latest processed data from S3 data_artifacts...")
-        
-        from utils.s3_io import list_keys, read_df_csv
+        # Check if we should skip S3 (for CI)
+        import os
         import pandas as pd
+        skip_s3 = os.environ.get('SKIP_S3_UPLOAD', 'false').lower() == 'true'
         
-        # Find the most recent data_artifacts timestamp
-        logger.info("🔍 Finding latest data artifacts in S3...")
-        artifact_keys = list_keys("artifacts/data_artifacts/")
-        
-        if not artifact_keys:
-            raise FileNotFoundError("No data artifacts found in S3. Please run data pipeline first.")
-        
-        # Extract timestamps from keys and find the latest
-        timestamps = []
-        for key in artifact_keys:
-            if "/X_train.csv" in key:  # Use X_train as marker for complete artifacts
-                timestamp = key.split("/")[-2]  # Extract timestamp folder
-                timestamps.append(timestamp)
-        
-        if not timestamps:
-            raise FileNotFoundError("No complete data artifacts found. Please run data pipeline first.")
-        
-        latest_timestamp = sorted(timestamps)[-1]
-        logger.info(f"✅ Found latest data artifacts: {latest_timestamp}")
-        
-        # Load processed datasets from S3
-        logger.info(f"📊 Loading processed datasets from S3...")
-        data_artifact_base = f"artifacts/data_artifacts/{latest_timestamp}"
-        
-        try:
-            X_train = read_df_csv(key=f"{data_artifact_base}/X_train.csv")
-            X_test = read_df_csv(key=f"{data_artifact_base}/X_test.csv")
-            y_train = read_df_csv(key=f"{data_artifact_base}/y_train.csv").iloc[:, 0]  # Extract series
-            y_test = read_df_csv(key=f"{data_artifact_base}/y_test.csv").iloc[:, 0]    # Extract series
+        if skip_s3:
+            # Load from local artifacts (saved by data pipeline in CI)
+            logger.info("📥 Loading processed data from LOCAL artifacts (S3 disabled for CI)...")
             
-            logger.info(f"✅ Data loaded from S3:")
-            logger.info(f"  • X_train: {X_train.shape[0]:,} rows × {X_train.shape[1]} features")
-            logger.info(f"  • X_test: {X_test.shape[0]:,} rows × {X_test.shape[1]} features")
-            logger.info(f"  • y_train: {len(y_train):,} samples")
-            logger.info(f"  • y_test: {len(y_test):,} samples")
-            logger.info(f"  • Source: s3://zuucrew-mlflow-artifacts-prod/{data_artifact_base}/")
+            try:
+                X_train = pd.read_pickle("artifacts/data/X_train.pkl")
+                X_test = pd.read_pickle("artifacts/data/X_test.pkl")
+                y_train = pd.read_pickle("artifacts/data/y_train.pkl")
+                y_test = pd.read_pickle("artifacts/data/y_test.pkl")
+                
+                logger.info(f"✅ Data loaded from local storage:")
+                logger.info(f"  • X_train: {X_train.shape[0]:,} rows × {X_train.shape[1]} features")
+                logger.info(f"  • X_test: {X_test.shape[0]:,} rows × {X_test.shape[1]} features")
+                logger.info(f"  • y_train: {len(y_train):,} samples")
+                logger.info(f"  • y_test: {len(y_test):,} samples")
+                logger.info(f"  • Source: artifacts/data/ (local)")
+                
+                # Convert to numpy arrays for sklearn compatibility
+                X_train = X_train.values
+                X_test = X_test.values
+                y_train = y_train.values
+                y_test = y_test.values
+                
+                logger.info(f"✅ Converted to numpy arrays for sklearn training")
+                latest_timestamp = "local_ci"
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to load data artifacts locally: {str(e)}")
+                raise FileNotFoundError("No local artifacts found. Data pipeline must run first in CI.")
+        
+        else:
+            # Load latest processed data from S3 data_artifacts
+            logger.info("📥 Loading latest processed data from S3 data_artifacts...")
             
-            # Convert to numpy arrays for sklearn compatibility
-            X_train = X_train.values
-            X_test = X_test.values
-            y_train = y_train.values
-            y_test = y_test.values
+            from utils.s3_io import list_keys, read_df_csv
             
-            logger.info(f"✅ Converted to numpy arrays for sklearn training")
+            # Find the most recent data_artifacts timestamp
+            logger.info("🔍 Finding latest data artifacts in S3...")
+            artifact_keys = list_keys("artifacts/data_artifacts/")
             
-        except Exception as e:
-            logger.error(f"❌ Failed to load data artifacts from S3: {str(e)}")
-            logger.info("🔄 Falling back to running data pipeline...")
-            processed_data = data_pipeline(processing_engine='pandas')
-            X_train = processed_data['X_train']
-            X_test = processed_data['X_test'] 
-            y_train = processed_data['Y_train']
-            y_test = processed_data['Y_test']
+            if not artifact_keys:
+                raise FileNotFoundError("No data artifacts found in S3. Please run data pipeline first.")
+            
+            # Extract timestamps from keys and find the latest
+            timestamps = []
+            for key in artifact_keys:
+                if "/X_train.csv" in key:  # Use X_train as marker for complete artifacts
+                    timestamp = key.split("/")[-2]  # Extract timestamp folder
+                    timestamps.append(timestamp)
+            
+            if not timestamps:
+                raise FileNotFoundError("No complete data artifacts found. Please run data pipeline first.")
+            
+            latest_timestamp = sorted(timestamps)[-1]
+            logger.info(f"✅ Found latest data artifacts: {latest_timestamp}")
+            
+            # Load processed datasets from S3
+            logger.info(f"📊 Loading processed datasets from S3...")
+            data_artifact_base = f"artifacts/data_artifacts/{latest_timestamp}"
+            
+            try:
+                X_train = read_df_csv(key=f"{data_artifact_base}/X_train.csv")
+                X_test = read_df_csv(key=f"{data_artifact_base}/X_test.csv")
+                y_train = read_df_csv(key=f"{data_artifact_base}/y_train.csv").iloc[:, 0]  # Extract series
+                y_test = read_df_csv(key=f"{data_artifact_base}/y_test.csv").iloc[:, 0]    # Extract series
+                
+                logger.info(f"✅ Data loaded from S3:")
+                logger.info(f"  • X_train: {X_train.shape[0]:,} rows × {X_train.shape[1]} features")
+                logger.info(f"  • X_test: {X_test.shape[0]:,} rows × {X_test.shape[1]} features")
+                logger.info(f"  • y_train: {len(y_train):,} samples")
+                logger.info(f"  • y_test: {len(y_test):,} samples")
+                logger.info(f"  • Source: s3://zuucrew-mlflow-artifacts-prod/{data_artifact_base}/")
+                
+                # Convert to numpy arrays for sklearn compatibility
+                X_train = X_train.values
+                X_test = X_test.values
+                y_train = y_train.values
+                y_test = y_test.values
+                
+                logger.info(f"✅ Converted to numpy arrays for sklearn training")
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to load data artifacts from S3: {str(e)}")
+                logger.info("🔄 Falling back to running data pipeline...")
+                processed_data = data_pipeline(processing_engine='pandas')
+                X_train = processed_data['X_train']
+                X_test = processed_data['X_test'] 
+                y_train = processed_data['Y_train']
+                y_test = processed_data['Y_test']
         
         # Train sklearn model with enhanced MLflow logging
         logger.info("🎯 Training RandomForest with scikit-learn...")
