@@ -266,6 +266,5 @@ def main():
         if 'producer' in locals():
             producer.close()
 
-
 if __name__ == "__main__":
     exit(main())

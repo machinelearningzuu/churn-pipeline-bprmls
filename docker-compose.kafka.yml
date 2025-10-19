@@ -9,8 +9,8 @@ services:
     container_name: kafka-broker
     hostname: kafka
     ports:
-      - "9092:9092"
-      - "9093:9093"
+      - "9092:9092" # Internal Docker Communication
+      - "9093:9093" # As the Controller
     environment:
       # KRaft mode configuration
       KAFKA_NODE_ID: 1

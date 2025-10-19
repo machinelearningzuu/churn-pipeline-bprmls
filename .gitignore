@@ -75,6 +75,7 @@ pyvenv.cfg
 credentials.json
 secrets.yaml
 secrets.yml
+config.example.yaml
 
 # ==========================================
 # ML Artifacts & Data
