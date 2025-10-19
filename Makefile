@@ -66,10 +66,17 @@ help:
 	@echo "  make resume-streaming    - ▶️  Resume Kafka (producer/consumer) + DAGs"
 	@echo ""
 	@echo "🔄 ML Pipeline Commands (Local - Pandas/Scikit-learn):"
-	@echo "  make data-pipeline       - Run data preprocessing (pandas + sklearn)"
-	@echo "  make train-pipeline      - Run model training (sklearn)"
-	@echo "  make inference-pipeline  - Run batch inference (pandas + sklearn)"
-	@echo "  make run-all             - Run all three pipelines in sequence"
+	@echo "  make data-pipeline       - Run data preprocessing (saves to S3)"
+	@echo "  make train-pipeline      - Run model training (saves to S3)"
+	@echo "  make inference-pipeline  - Run batch inference"
+	@echo "  make run-all             - Run all three pipelines (S3 mode)"
+	@echo ""
+	@echo "📂 LOCAL-ONLY Pipeline Commands (No S3/AWS Credentials Needed):"
+	@echo "  make data-pipeline-local    - Run data pipeline (saves to artifacts/data/)"
+	@echo "  make train-pipeline-local   - Run training (saves to artifacts/models/)"
+	@echo "  make inference-pipeline-local - Run inference locally"
+	@echo "  make run-all-local          - Run all pipelines locally"
+	@echo "  make validate-model-local   - Validate local model (F1 >= 75%)"
 	@echo ""
 	@echo "🐳 Environment Control:"
 	@echo "  CONTAINERIZED=true make train-pipeline    - Use Docker MLflow URL"
@@ -345,6 +352,37 @@ inference-pipeline: setup-dirs
 	@echo "🔮 Running batch inference pipeline..."
 	@.venv/bin/python pipelines/inference_pipeline.py --engine pandas
 	@echo "✅ Inference pipeline completed successfully!"
+
+# ==========================================
+# 📂 LOCAL-ONLY Pipeline Commands (No S3)
+# ==========================================
+# Run pipelines with local artifact storage (no AWS credentials needed)
+data-pipeline-local: setup-dirs
+	@echo "🔄 Running data preprocessing pipeline (LOCAL mode - no S3)..."
+	@SKIP_S3_UPLOAD=true .venv/bin/python pipelines/data_pipeline.py --engine pandas
+	@echo "✅ Data pipeline completed! Artifacts saved to: artifacts/data/"
+
+train-pipeline-local: setup-dirs
+	@echo "🎯 Running model training pipeline (LOCAL mode - no S3)..."
+	@SKIP_S3_UPLOAD=true .venv/bin/python pipelines/training_pipeline.py --engine sklearn
+	@echo "✅ Training pipeline completed! Model saved to: artifacts/models/best_model.pkl"
+
+inference-pipeline-local: setup-dirs
+	@echo "🔮 Running batch inference pipeline (LOCAL mode - no S3)..."
+	@SKIP_S3_UPLOAD=true .venv/bin/python pipelines/inference_pipeline.py --engine pandas
+	@echo "✅ Inference pipeline completed!"
+
+# Run all pipelines locally
+run-all-local: data-pipeline-local train-pipeline-local inference-pipeline-local
+	@echo "🎉 All pipelines completed (LOCAL mode)!"
+	@echo "📂 Check artifacts/data/ for processed data"
+	@echo "📂 Check artifacts/models/ for trained model"
+
+# Validate local model
+validate-model-local:
+	@echo "🔍 Validating locally trained model..."
+	@.venv/bin/python tests/validate_model_simple.py
+	@echo "✅ Model validation completed!"
 
 # Run all pipelines in sequence
 run-all: data-pipeline train-pipeline inference-pipeline
