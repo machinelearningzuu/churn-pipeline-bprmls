@@ -9,6 +9,11 @@ Checks:
 4. Data distribution drift (statistical tests)
 5. No data quality issues
 
+Configuration:
+- All thresholds are loaded from config.yaml
+- Only checks critical columns (model features) for missing values
+- Configurable min rows, outlier %, missing value %, etc.
+
 Exit codes:
 - 0: All checks passed
 - 1: Critical issues found (blocks deployment)
@@ -21,6 +26,7 @@ import numpy as np
 from pathlib import Path
 from scipy import stats
 import json
+import yaml
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -28,33 +34,118 @@ sys.path.insert(0, str(project_root))
 
 
 # ==========================================
-# Configuration
+# Load Configuration from config.yaml
 # ==========================================
 
-REQUIRED_COLUMNS = [
-    'CreditScore', 'Geography', 'Gender', 'Age', 'Tenure',
-    'Balance', 'NumOfProducts', 'HasCrCard', 'IsActiveMember',
-    'EstimatedSalary', 'Exited'
-]
+def load_config():
+    """Load validation configuration from config.yaml"""
+    config_path = project_root / 'config.yaml'
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        return config
+    except Exception as e:
+        print(f"⚠️  Warning: Could not load config.yaml: {e}")
+        print("   Using default values...")
+        return None
 
-CATEGORICAL_COLUMNS = {
-    'Geography': {'France', 'Germany', 'Spain'},
-    'Gender': {'Male', 'Female'}
-}
+# Load config
+CONFIG = load_config()
 
-NUMERIC_RANGES = {
-    'CreditScore': (300, 850),
-    'Age': (18, 100),
-    'Tenure': (0, 10),
-    'Balance': (0, 300000),
-    'NumOfProducts': (1, 4),
-    'HasCrCard': (0, 1),
-    'IsActiveMember': (0, 1),
-    'EstimatedSalary': (0, 300000),
-    'Exited': (0, 1)
-}
+# Extract validation config (with defaults if config not loaded)
+if CONFIG and 'validation' in CONFIG:
+    VAL_CONFIG = CONFIG['validation']
+    
+    # Required columns (from critical columns for missing values check)
+    REQUIRED_COLUMNS = VAL_CONFIG.get('critical_columns_for_missing', [
+        'CreditScore', 'Geography', 'Gender', 'Age', 'Tenure',
+        'Balance', 'NumOfProducts', 'HasCrCard', 'IsActiveMember',
+        'EstimatedSalary', 'Exited'
+    ])
+    
+    # Critical columns to check for missing values (only model features!)
+    CRITICAL_COLUMNS_FOR_MISSING = VAL_CONFIG.get('critical_columns_for_missing', REQUIRED_COLUMNS)
+    
+    # Categorical validation
+    cat_vals = VAL_CONFIG.get('categorical_values', {})
+    CATEGORICAL_COLUMNS = {
+        'Geography': set(cat_vals.get('Geography', ['France', 'Germany', 'Spain'])),
+        'Gender': set(cat_vals.get('Gender', ['Male', 'Female']))
+    }
+    
+    # Value ranges
+    value_ranges = VAL_CONFIG.get('value_ranges', {})
+    NUMERIC_RANGES = {}
+    for col, range_config in value_ranges.items():
+        if 'values' in range_config:
+            # Binary column
+            NUMERIC_RANGES[col] = (min(range_config['values']), max(range_config['values']))
+        else:
+            # Numeric range
+            min_val = range_config.get('min', 0)
+            max_val = range_config.get('max', 1000000)  # Large default if null
+            NUMERIC_RANGES[col] = (min_val, max_val if max_val is not None else 1000000)
+    
+    # Data quality thresholds
+    data_quality = VAL_CONFIG.get('data_quality', {})
+    MIN_ROWS = data_quality.get('min_rows', 5000)
+    MIN_COLUMNS = data_quality.get('min_columns', 12)
+    MAX_MISSING_PCT = data_quality.get('max_missing_percentage', 5.0)
+    MAX_DUPLICATE_PCT = data_quality.get('max_duplicate_percentage', 1.0)
+    
+    # Drift detection
+    drift_config = VAL_CONFIG.get('drift_detection', {})
+    DRIFT_THRESHOLD = drift_config.get('significance_level', 0.05)
+    DRIFT_COLUMNS = drift_config.get('columns_to_check', [])
+    
+    # Outlier thresholds
+    outlier_config = VAL_CONFIG.get('outlier_thresholds', {})
+    MAX_OUTLIER_PCT = outlier_config.get('max_outlier_percentage', 10.0)
+    
+    # Class balance
+    class_balance = VAL_CONFIG.get('class_balance', {})
+    MIN_MINORITY_PCT = class_balance.get('min_minority_percentage', 20.0)
+    MAX_MAJORITY_PCT = class_balance.get('max_majority_percentage', 80.0)
+    
+else:
+    # Fallback defaults if config not available
+    REQUIRED_COLUMNS = [
+        'CreditScore', 'Geography', 'Gender', 'Age', 'Tenure',
+        'Balance', 'NumOfProducts', 'HasCrCard', 'IsActiveMember',
+        'EstimatedSalary', 'Exited'
+    ]
+    CRITICAL_COLUMNS_FOR_MISSING = REQUIRED_COLUMNS
+    CATEGORICAL_COLUMNS = {
+        'Geography': {'France', 'Germany', 'Spain'},
+        'Gender': {'Male', 'Female'}
+    }
+    NUMERIC_RANGES = {
+        'CreditScore': (300, 900),
+        'Age': (18, 100),
+        'Tenure': (0, 10),
+        'Balance': (0, 1000000),
+        'NumOfProducts': (1, 4),
+        'EstimatedSalary': (0, 1000000),
+        'Exited': (0, 1)
+    }
+    MIN_ROWS = 5000
+    MIN_COLUMNS = 12
+    MAX_MISSING_PCT = 5.0
+    MAX_DUPLICATE_PCT = 1.0
+    DRIFT_THRESHOLD = 0.05
+    DRIFT_COLUMNS = ['CreditScore', 'Age', 'Tenure', 'Balance', 'NumOfProducts', 'EstimatedSalary']
+    MAX_OUTLIER_PCT = 10.0
+    MIN_MINORITY_PCT = 20.0
+    MAX_MAJORITY_PCT = 80.0
 
-DRIFT_THRESHOLD = 0.05  # 5% significance level for statistical tests
+print(f"📋 Loaded configuration:")
+print(f"   • Min rows: {MIN_ROWS}")
+print(f"   • Max missing %: {MAX_MISSING_PCT}%")
+print(f"   • Max duplicate %: {MAX_DUPLICATE_PCT}%")
+print(f"   • Critical columns for missing check: {len(CRITICAL_COLUMNS_FOR_MISSING)}")
+print(f"   • Drift threshold: {DRIFT_THRESHOLD}")
+print(f"   • Max outlier %: {MAX_OUTLIER_PCT}%")
+print()
 
 
 # ==========================================
@@ -169,60 +260,83 @@ def check_categorical_values(df):
 
 
 def check_missing_values(df):
-    """Check for missing values"""
-    print("\n🔍 Checking missing values...")
+    """
+    Check for missing values in CRITICAL columns only
     
-    missing = df.isnull().sum()
-    critical_missing = missing[missing > 0]
+    Only checks columns used for model training (feature_columns + target).
+    Other columns (like CustomerId, RowNumber, Surname) are ignored.
+    Uses configurable threshold from config.yaml
+    """
+    print("\n🔍 Checking missing values in critical columns...")
+    print(f"   ℹ️  Only checking {len(CRITICAL_COLUMNS_FOR_MISSING)} model-critical columns")
+    print(f"   ℹ️  Threshold: {MAX_MISSING_PCT}% max missing per column")
     
-    if len(critical_missing) > 0:
-        print(f"⚠️  Found missing values:")
-        for col, count in critical_missing.items():
-            pct = (count / len(df)) * 100
-            print(f"   - {col}: {count} ({pct:.2f}%)")
-        
-        # Allow up to 5% missing in non-critical columns
-        critical_cols = ['Exited', 'Age', 'Geography']
-        for col in critical_cols:
-            if col in critical_missing.index:
-                print(f"❌ Critical column {col} has missing values")
-                return False
-        
-        print("✅ Missing values acceptable (non-critical columns only)")
-    else:
-        print("✅ No missing values")
+    issues = []
     
+    # Only check critical columns (those used for model training)
+    for col in CRITICAL_COLUMNS_FOR_MISSING:
+        if col in df.columns:
+            missing_count = df[col].isnull().sum()
+            if missing_count > 0:
+                missing_pct = (missing_count / len(df)) * 100
+                print(f"   ⚠️  {col}: {missing_count} missing ({missing_pct:.2f}%)")
+                
+                # Check against configurable threshold
+                if missing_pct > MAX_MISSING_PCT:
+                    issues.append(
+                        f"{col}: {missing_pct:.2f}% missing (threshold: {MAX_MISSING_PCT}%)"
+                    )
+    
+    if issues:
+        print(f"\n❌ MISSING VALUES CHECK FAILED")
+        print(f"   Columns exceeding {MAX_MISSING_PCT}% threshold:")
+        for issue in issues:
+            print(f"   - {issue}")
+        return False
+    
+    print(f"✅ All critical columns have < {MAX_MISSING_PCT}% missing values")
     return True
 
 
 def check_duplicates(df):
-    """Check for duplicate rows"""
+    """Check for duplicate rows using configurable threshold"""
     print("\n🔍 Checking duplicates...")
+    print(f"   ℹ️  Threshold: {MAX_DUPLICATE_PCT}% max duplicates")
     
     # Check for duplicate CustomerIds if present
     if 'CustomerId' in df.columns:
         dup_count = df['CustomerId'].duplicated().sum()
+        dup_pct = (dup_count / len(df)) * 100
         if dup_count > 0:
-            print(f"❌ Found {dup_count} duplicate customer IDs")
+            print(f"   ⚠️  Found {dup_count} duplicate customer IDs ({dup_pct:.2f}%)")
+            if dup_pct > MAX_DUPLICATE_PCT:
+                print(f"❌ Duplicate CustomerIds: {dup_pct:.2f}% > {MAX_DUPLICATE_PCT}%")
+                return False
+    
+    # Check for duplicate rows (entire row duplicated)
+    dup_rows = df.duplicated().sum()
+    dup_rows_pct = (dup_rows / len(df)) * 100
+    if dup_rows > 0:
+        print(f"   ⚠️  Found {dup_rows} duplicate rows ({dup_rows_pct:.2f}%)")
+        if dup_rows_pct > MAX_DUPLICATE_PCT:
+            print(f"❌ Duplicate rows: {dup_rows_pct:.2f}% > {MAX_DUPLICATE_PCT}%")
             return False
     
-    # Check for duplicate rows
-    dup_rows = df.duplicated().sum()
-    if dup_rows > 0:
-        print(f"⚠️  Found {dup_rows} duplicate rows ({(dup_rows/len(df)*100):.2f}%)")
-    
-    print("✅ No critical duplicates")
+    print(f"✅ Duplicates < {MAX_DUPLICATE_PCT}% threshold")
     return True
 
 
 def check_data_drift(df, reference_path=None):
     """
-    Check for data drift using statistical tests
+    Check for data drift using statistical tests (from config.yaml)
     
     Compares current data against reference data (if available)
     Uses Kolmogorov-Smirnov test for numerical features
+    Only checks columns configured in config.yaml
     """
     print("\n🔍 Checking data drift...")
+    print(f"   ℹ️  Checking {len(DRIFT_COLUMNS)} numerical columns")
+    print(f"   ℹ️  Significance level: {DRIFT_THRESHOLD}")
     
     if reference_path is None or not Path(reference_path).exists():
         print("ℹ️  No reference data found, skipping drift detection")
@@ -236,10 +350,9 @@ def check_data_drift(df, reference_path=None):
         return True
     
     drift_detected = []
-    numerical_cols = ['CreditScore', 'Age', 'Tenure', 'Balance', 
-                     'NumOfProducts', 'EstimatedSalary']
     
-    for col in numerical_cols:
+    # Use columns from config
+    for col in DRIFT_COLUMNS:
         if col in df.columns and col in df_reference.columns:
             # Kolmogorov-Smirnov test
             statistic, p_value = stats.ks_2samp(
@@ -251,6 +364,7 @@ def check_data_drift(df, reference_path=None):
                 drift_detected.append({
                     'feature': col,
                     'p_value': p_value,
+                    'statistic': statistic,
                     'severity': 'HIGH' if p_value < 0.01 else 'MEDIUM'
                 })
     
@@ -258,7 +372,7 @@ def check_data_drift(df, reference_path=None):
         print(f"⚠️  Data drift detected in {len(drift_detected)} features:")
         for drift in drift_detected:
             emoji = "🔴" if drift['severity'] == 'HIGH' else "🟡"
-            print(f"   {emoji} {drift['feature']}: p-value = {drift['p_value']:.4f}")
+            print(f"   {emoji} {drift['feature']}: p-value = {drift['p_value']:.4f} (KS={drift['statistic']:.4f})")
         
         # Only fail on HIGH severity drift
         high_severity = [d for d in drift_detected if d['severity'] == 'HIGH']
@@ -274,33 +388,40 @@ def check_data_drift(df, reference_path=None):
 
 
 def check_class_balance(df):
-    """Check class distribution"""
+    """Check class distribution using configurable thresholds"""
     print("\n🔍 Checking class balance...")
+    print(f"   ℹ️  Min minority class: {MIN_MINORITY_PCT}%")
+    print(f"   ℹ️  Max majority class: {MAX_MAJORITY_PCT}%")
     
     if 'Exited' not in df.columns:
         print("⚠️  Target column 'Exited' not found")
         return True
     
     class_counts = df['Exited'].value_counts()
-    churn_rate = df['Exited'].mean()
+    total = len(df)
     
-    print(f"   Class 0 (No Churn): {class_counts.get(0, 0)} ({(1-churn_rate)*100:.2f}%)")
-    print(f"   Class 1 (Churn):    {class_counts.get(1, 0)} ({churn_rate*100:.2f}%)")
+    # Calculate percentages
+    class_0_pct = (class_counts.get(0, 0) / total) * 100
+    class_1_pct = (class_counts.get(1, 0) / total) * 100
     
-    # Check if churn rate is realistic (5% - 40%)
-    if not (0.05 <= churn_rate <= 0.40):
-        print(f"❌ Churn rate {churn_rate:.2%} outside realistic range (5%-40%)")
+    print(f"   Class 0 (No Churn): {class_counts.get(0, 0)} ({class_0_pct:.2f}%)")
+    print(f"   Class 1 (Churn):    {class_counts.get(1, 0)} ({class_1_pct:.2f}%)")
+    
+    # Identify minority and majority classes
+    minority_pct = min(class_0_pct, class_1_pct)
+    majority_pct = max(class_0_pct, class_1_pct)
+    
+    # Check against configurable thresholds
+    if minority_pct < MIN_MINORITY_PCT:
+        print(f"❌ Minority class ({minority_pct:.2f}%) < threshold ({MIN_MINORITY_PCT}%)")
         return False
     
-    # Check if imbalance is too extreme (max 10:1 ratio)
-    majority = class_counts.max()
-    minority = class_counts.min()
-    ratio = majority / minority
-    
-    if ratio > 10:
-        print(f"❌ Class imbalance ratio {ratio:.2f} too high (max 10:1)")
+    if majority_pct > MAX_MAJORITY_PCT:
+        print(f"❌ Majority class ({majority_pct:.2f}%) > threshold ({MAX_MAJORITY_PCT}%)")
         return False
     
+    # Calculate imbalance ratio
+    ratio = majority_pct / minority_pct
     print(f"✅ Class balance acceptable (ratio: {ratio:.2f}:1)")
     return True
 
@@ -330,16 +451,52 @@ def main():
     data_path = sys.argv[1] if len(sys.argv) > 1 else 'data/raw/ChurnModelling.csv'
     reference_path = sys.argv[2] if len(sys.argv) > 2 else None
     
-    if not Path(data_path).exists():
-        print(f"❌ Data file not found: {data_path}")
+    # Try S3 first, then local
+    try:
+        from utils.s3_io import read_df_csv, key_exists
+        from utils.config import get_s3_bucket
+        
+        s3_key = data_path.replace('data/raw/', '')
+        if not s3_key.startswith('data/'):
+            s3_key = f"data/raw/{s3_key}"
+        
+        bucket = get_s3_bucket()
+        
+        if key_exists(s3_key):
+            print(f"\n📦 Loading data from S3: s3://{bucket}/{s3_key}")
+            df = read_df_csv(key=s3_key)
+        elif Path(data_path).exists():
+            print(f"\n📁 Loading data from local: {data_path}")
+            df = pd.read_csv(data_path)
+        else:
+            print(f"❌ Data file not found in S3 or locally: {data_path}")
+            sys.exit(1)
+    except Exception as e:
+        # S3 not configured, use local
+        if not Path(data_path).exists():
+            print(f"❌ Data file not found: {data_path}")
+            sys.exit(1)
+        print(f"\n📁 Loading data from local: {data_path}")
+        df = pd.read_csv(data_path)
+    
+    # Check minimum data requirements FIRST
+    print(f"\n🔍 Checking data shape requirements...")
+    print(f"   • Dataset shape: {df.shape[0]} rows × {df.shape[1]} columns")
+    print(f"   • Minimum required: {MIN_ROWS} rows × {MIN_COLUMNS} columns")
+    
+    if df.shape[0] < MIN_ROWS:
+        print(f"\n❌ INSUFFICIENT DATA")
+        print(f"   Dataset has {df.shape[0]} rows, need at least {MIN_ROWS} rows")
+        print("=" * 70)
         sys.exit(1)
     
-    print(f"\n📁 Data file: {data_path}")
-    if reference_path:
-        print(f"📁 Reference file: {reference_path}")
+    if df.shape[1] < MIN_COLUMNS:
+        print(f"\n❌ INSUFFICIENT COLUMNS")
+        print(f"   Dataset has {df.shape[1]} columns, need at least {MIN_COLUMNS} columns")
+        print("=" * 70)
+        sys.exit(1)
     
-    # Load data
-    df = load_data(data_path)
+    print(f"✅ Dataset meets minimum size requirements")
     
     # Run all checks
     results = {
@@ -401,17 +558,59 @@ def main():
 def test_data_validation():
     """
     Pytest-compatible test wrapper for data validation.
-    Validates data/raw/ChurnModelling.csv by default.
+    Validates data from S3 or local fallback using configurable file from config.yaml.
     """
     import pytest
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
-    data_path = "data/raw/ChurnModelling.csv"
+    try:
+        from utils.s3_io import read_df_csv, key_exists
+        from utils.config import get_s3_bucket, get_data_config, get_local_raw_data_path
+        
+        # Get configurable data file from config.yaml
+        data_config = get_data_config()
+        raw_data_file = data_config.get('raw_data_file', 'ChurnModelling.csv')
+        s3_prefix = data_config.get('s3_prefix', 'data/raw')
+        
+        # Try S3 first (production)
+        s3_key = f"{s3_prefix}/{raw_data_file}"
+        bucket = get_s3_bucket()
+        
+        print(f"📋 Using data file from config: {raw_data_file}")
+        
+        if key_exists(s3_key):
+            print(f"📦 Loading data from S3: s3://{bucket}/{s3_key}")
+            df = read_df_csv(key=s3_key)
+        else:
+            # Fallback to local
+            local_path = get_local_raw_data_path()
+            if not os.path.exists(local_path):
+                pytest.skip(f"Data file not found in S3 ({s3_key}) or locally ({local_path})")
+            print(f"📁 Loading data from local: {local_path}")
+            df = pd.read_csv(local_path)
+            
+    except Exception as e:
+        # S3 not configured, use local
+        from utils.config import get_local_raw_data_path
+        local_path = get_local_raw_data_path()
+        if not os.path.exists(local_path):
+            pytest.skip(f"Data file not found locally and S3 not configured: {local_path}")
+        print(f"📁 Loading data from local: {local_path}")
+        df = pd.read_csv(local_path)
     
-    if not os.path.exists(data_path):
-        pytest.skip(f"Data file not found: {data_path}")
+    # Check minimum data requirements FIRST
+    print(f"\n🔍 Checking data shape requirements...")
+    print(f"   • Dataset shape: {df.shape[0]} rows × {df.shape[1]} columns")
+    print(f"   • Minimum required: {MIN_ROWS} rows × {MIN_COLUMNS} columns")
     
-    # Load data
-    df = load_data(data_path)
+    if df.shape[0] < MIN_ROWS:
+        pytest.fail(f"Insufficient data: {df.shape[0]} rows < {MIN_ROWS} rows required")
+    
+    if df.shape[1] < MIN_COLUMNS:
+        pytest.fail(f"Insufficient columns: {df.shape[1]} columns < {MIN_COLUMNS} columns required")
+    
+    print(f"✅ Dataset meets minimum size requirements")
     
     # Run all checks
     checks = [

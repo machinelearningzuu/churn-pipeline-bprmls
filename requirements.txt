@@ -9,10 +9,6 @@ pyspark>=3.4.0
 pyspark[sql]>=3.4.0
 pyspark[ml]>=3.4.0
 
-# ML Pipeline (ZenML will be added back later)
-# zenml>=0.50.0
-# zenml[server]>=0.50.0
-
 # Model Libraries
 xgboost>=2.1.0
 lightgbm>=3.3.0

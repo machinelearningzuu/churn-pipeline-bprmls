@@ -115,6 +115,49 @@ def get_data_config() ->Dict[str, Any]:
     return config.get('data', {})
 
 
+def get_raw_data_path() -> str:
+    """
+    Get the raw data path based on config selection.
+    
+    Returns:
+        Full S3 path to the raw data file
+    """
+    config = load_config()
+    data_config = config.get('data', {})
+    
+    # Get configurable file name (default to original)
+    raw_data_file = data_config.get('raw_data_file', 'ChurnModelling.csv')
+    s3_bucket = data_config.get('s3_bucket', 'zuucrew-mlflow-artifacts-prod')
+    s3_prefix = data_config.get('s3_prefix', 'data/raw')
+    
+    # Construct full S3 path
+    s3_path = f"s3://{s3_bucket}/{s3_prefix}/{raw_data_file}"
+    
+    logger.info(f"Using raw data file: {raw_data_file}")
+    logger.info(f"Full S3 path: {s3_path}")
+    
+    return s3_path
+
+
+def get_local_raw_data_path() -> str:
+    """
+    Get the local raw data path based on config selection.
+    
+    Returns:
+        Local file path to the raw data file
+    """
+    config = load_config()
+    data_config = config.get('data', {})
+    
+    # Get configurable file name (default to original)
+    raw_data_file = data_config.get('raw_data_file', 'ChurnModelling.csv')
+    
+    # Construct local path
+    local_path = f"data/raw/{raw_data_file}"
+    
+    return local_path
+
+
 def get_preprocessing_config() ->Dict[str, Any]:
     config = get_config()
     return config.get('preprocessing', {})

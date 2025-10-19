@@ -137,14 +137,15 @@ help:
 # SETUP AND ENVIRONMENT COMMANDS
 # ========================================================================================
 
-# Install project dependencies and set up environment
+# Install project dependencies and set up environment using uv
 install:
-	@echo "📦 Installing project dependencies and setting up environment..."
-	@echo "Creating virtual environment..."
-	@python3 -m venv .venv
-	@echo "Activating virtual environment and installing dependencies..."
-	@source .venv/bin/activate && pip install --upgrade pip
-	@source .venv/bin/activate && pip install -r requirements.txt
+	@echo "📦 Installing project dependencies with uv (fast!)..."
+	@echo "Creating virtual environment with uv..."
+	@uv venv
+	@echo "Installing dependencies with uv..."
+	@uv pip install -r requirements.txt
+	@echo "Installing project in editable mode..."
+	@uv pip install -e .
 	@echo "✅ Installation completed successfully!"
 	@echo "To activate the virtual environment, run: source .venv/bin/activate"
 
@@ -324,25 +325,25 @@ docker-image-sizes:
 # Run data preprocessing pipeline
 data-pipeline: setup-dirs
 	@echo "🔄 Running data preprocessing pipeline..."
-	@python3 pipelines/data_pipeline.py --engine pandas
+	@.venv/bin/python pipelines/data_pipeline.py --engine pandas
 	@echo "✅ Data pipeline completed successfully!"
 
 # Run model training pipeline
 train-pipeline: setup-dirs
 	@echo "🎯 Running model training pipeline..."
-	@python3 pipelines/training_pipeline.py --engine sklearn
+	@.venv/bin/python pipelines/training_pipeline.py --engine sklearn
 	@echo "✅ Training pipeline completed successfully!"
 
 # Run model training pipeline with Docker MLflow URL
 train-pipeline-docker: setup-dirs
 	@echo "🎯 Running model training pipeline (Docker MLflow)..."
-	@CONTAINERIZED=true python3 pipelines/training_pipeline.py --engine sklearn
+	@CONTAINERIZED=true .venv/bin/python pipelines/training_pipeline.py --engine sklearn
 	@echo "✅ Training pipeline (Docker MLflow) completed successfully!"
 
 # Run batch inference pipeline
 inference-pipeline: setup-dirs
 	@echo "🔮 Running batch inference pipeline..."
-	@python3 pipelines/inference_pipeline.py --engine pandas
+	@.venv/bin/python pipelines/inference_pipeline.py --engine pandas
 	@echo "✅ Inference pipeline completed successfully!"
 
 # Run all pipelines in sequence

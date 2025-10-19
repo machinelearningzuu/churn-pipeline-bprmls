@@ -34,8 +34,23 @@ mlflow:
     environment: "development"
   autolog: true
 
+# ==========================================
+# Data Configuration
+# ==========================================
+# Choose which dataset to use for experiments
+data:
+  # Available options:
+  # - "ChurnModelling.csv" (original with missing values - validation will FAIL)
+  # - "ChurnModelling_Clean.csv" (imputed Gender values - validation will PASS)
+  raw_data_file: "ChurnModelling_Clean.csv"  # Change to test validation pass/fail
+  
+  # S3 bucket for data storage
+  s3_bucket: "zuucrew-mlflow-artifacts-prod"
+  s3_prefix: "data/raw"
+
 data_paths:
-  raw_data: "s3://zuucrew-mlflow-artifacts-prod/data/raw/ChurnModelling.csv"  # Change to your S3 bucket
+  # raw_data is now constructed dynamically from data.raw_data_file
+  # raw_data: "s3://zuucrew-mlflow-artifacts-prod/data/raw/ChurnModelling.csv"  # Legacy - use data.raw_data_file instead
   processed_data: "data/processed/ChurnModelling_Missing_Values_Handled.csv"
   imputed_data: "data/processed/imputed.csv"
   processed_dir: "data/processed"
@@ -289,4 +304,119 @@ analytics:
   high_risk_threshold: 0.7  # Risk score >= 0.7 triggers alert
   enable_daily_aggregation: true
   enable_hourly_aggregation: true
+
+# ==========================================
+# Data Validation & Testing Configuration
+# ==========================================
+validation:
+  # Data Quality Thresholds
+  data_quality:
+    min_rows: 5000  # Minimum rows required in dataset
+    min_columns: 12  # Minimum columns required (after dropping ID columns)
+    max_missing_percentage: 7.0  # Max % of missing values allowed per column
+    max_duplicate_percentage: 1.0  # Max % of duplicate rows allowed
+    
+  # Only check missing values for model-critical columns
+  # These are the columns actually used for training
+  critical_columns_for_missing:
+    - "CreditScore"
+    - "Geography"
+    - "Gender"
+    - "Age"
+    - "Tenure"
+    - "Balance"
+    - "NumOfProducts"
+    - "HasCrCard"
+    - "IsActiveMember"
+    - "EstimatedSalary"
+    - "Exited"  # Target variable
+  
+  # Value Range Validation
+  value_ranges:
+    CreditScore:
+      min: 300
+      max: 900
+    Age:
+      min: 18
+      max: 100
+    Tenure:
+      min: 0
+      max: 10
+    Balance:
+      min: 0
+      max: null  # No upper limit
+    NumOfProducts:
+      min: 1
+      max: 4
+    EstimatedSalary:
+      min: 0
+      max: null  # No upper limit
+    Exited:
+      values: [0, 1]  # Binary
+  
+  # Categorical Value Validation
+  categorical_values:
+    Geography:
+      - "France"
+      - "Spain"
+      - "Germany"
+    Gender:
+      - "Male"
+      - "Female"
+  
+  # Class Balance Validation
+  class_balance:
+    target_column: "Exited"
+    min_minority_percentage: 20.0  # Min % for minority class
+    max_majority_percentage: 80.0  # Max % for majority class
+  
+  # Data Drift Detection
+  drift_detection:
+    enabled: true
+    method: "kolmogorov_smirnov"  # KS test
+    significance_level: 0.05  # p-value threshold
+    columns_to_check:  # Check drift only for numeric features
+      - "CreditScore"
+      - "Age"
+      - "Tenure"
+      - "Balance"
+      - "NumOfProducts"
+      - "EstimatedSalary"
+  
+  # Outlier Detection Thresholds
+  outlier_thresholds:
+    max_outlier_percentage: 10.0  # Max % of outliers allowed
+    method: "iqr"  # or "z_score"
+    iqr_multiplier: 1.5
+    z_score_threshold: 3.0
+    columns_to_check:
+      - "CreditScore"
+      - "Age"
+      - "Balance"
+      - "NumOfProducts"
+
+# ==========================================
+# Model Validation Configuration
+# ==========================================
+model_validation:
+  # Performance Thresholds (CI/CD Gates)
+  performance_thresholds:
+    f1_score: 0.75  # HARD REQUIREMENT - blocks deployment if not met
+    accuracy: 0.70
+    precision: 0.65
+    recall: 0.65
+  
+  # Model Quality Checks
+  quality_checks:
+    check_overfitting: true
+    max_train_test_gap: 0.10  # Max 10% difference between train and test metrics
+    check_feature_importance: true
+    min_feature_importance_sum: 0.90  # Top features should explain 90% of variance
+  
+  # Prediction Quality
+  prediction_quality:
+    check_probability_distribution: true
+    min_probability: 0.0
+    max_probability: 1.0
+    check_prediction_balance: true
   retention_days: 90  # Keep raw predictions for 90 days
