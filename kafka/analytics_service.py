@@ -103,9 +103,55 @@ class ChurnAnalyticsService:
         except Exception as e:
             logger.error(f"Failed to process prediction: {e}")
     
+    def ensure_connection(self):
+        """Ensure database connection is alive, reconnect if needed"""
+        try:
+            # Check if connection exists and is alive
+            if self.db_conn is None or self.db_conn.closed:
+                logger.warning("⚠️  Database connection lost, reconnecting...")
+                self.db_conn = psycopg2.connect(
+                    host=RDS_HOST,
+                    port=RDS_PORT,
+                    database=RDS_DB,
+                    user=RDS_USER,
+                    password=RDS_PASSWORD
+                )
+                self.db_conn.autocommit = True
+                logger.info("✅ Database connection restored")
+                return True
+            
+            # Test connection with a simple query
+            cursor = self.db_conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to ensure connection: {e}")
+            # Try to reconnect
+            try:
+                self.db_conn = psycopg2.connect(
+                    host=RDS_HOST,
+                    port=RDS_PORT,
+                    database=RDS_DB,
+                    user=RDS_USER,
+                    password=RDS_PASSWORD
+                )
+                self.db_conn.autocommit = True
+                logger.info("✅ Database connection restored")
+                return True
+            except Exception as reconnect_error:
+                logger.error(f"Failed to reconnect: {reconnect_error}")
+                return False
+    
     def write_high_risk_alert(self, prediction: Dict[str, Any]):
         """Write high-risk customer alert to RDS"""
         try:
+            # Ensure connection is alive
+            if not self.ensure_connection():
+                logger.error("Cannot write high-risk alert: no database connection")
+                return
+            
             cursor = self.db_conn.cursor()
             
             insert_query = """
@@ -135,6 +181,11 @@ class ChurnAnalyticsService:
     def aggregate_hourly_metrics(self):
         """Aggregate hourly metrics from churn_predictions table"""
         try:
+            # Ensure connection is alive
+            if not self.ensure_connection():
+                logger.error("Cannot aggregate hourly metrics: no database connection")
+                return
+            
             cursor = self.db_conn.cursor()
             
             # Get current hour
@@ -188,6 +239,11 @@ class ChurnAnalyticsService:
     def aggregate_daily_metrics(self):
         """Aggregate daily metrics from churn_predictions table"""
         try:
+            # Ensure connection is alive
+            if not self.ensure_connection():
+                logger.error("Cannot aggregate daily metrics: no database connection")
+                return
+            
             cursor = self.db_conn.cursor()
             
             # Get current date
