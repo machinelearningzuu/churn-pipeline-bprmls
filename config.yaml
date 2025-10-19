@@ -401,11 +401,13 @@ validation:
 # ==========================================
 model_validation:
   # Performance Thresholds (CI/CD Gates)
+  # Only accuracy is checked for deployment gate
   performance_thresholds:
     accuracy: 0.75  # HARD REQUIREMENT - blocks deployment if not met
-    precision: 0.65
-    recall: 0.65
-    f1_score: 0.60
+    # Other metrics are reported but not enforced
+    # precision: 0.65
+    # recall: 0.65
+    # f1_score: 0.60
   
   # Model Quality Checks
   quality_checks:

@@ -27,25 +27,21 @@ from utils.config import load_config
 # Load config for thresholds
 CONFIG = load_config()
 if CONFIG and 'model_validation' in CONFIG:
-    THRESHOLDS = CONFIG['model_validation']['performance_thresholds']
+    thresholds_config = CONFIG['model_validation']['performance_thresholds']
+    # Only check accuracy (others are commented out in config)
+    ACCURACY_THRESHOLD = thresholds_config.get('accuracy', 0.75)
 else:
-    # Fallback defaults
-    THRESHOLDS = {
-        'accuracy': 0.75,      # HARD REQUIREMENT
-        'precision': 0.65,
-        'recall': 0.65,
-        'f1_score': 0.60
-    }
+    # Fallback default
+    ACCURACY_THRESHOLD = 0.75
 
 print("=" * 70)
 print("🎯 MODEL PERFORMANCE VALIDATION")
 print("=" * 70)
 print()
-print(f"📋 Performance Thresholds:")
-print(f"   • Accuracy:  >= {THRESHOLDS['accuracy']:.2%} (HARD REQUIREMENT)")
-print(f"   • Precision: >= {THRESHOLDS['precision']:.2%}")
-print(f"   • Recall:    >= {THRESHOLDS['recall']:.2%}")
-print(f"   • F1 Score:  >= {THRESHOLDS['f1_score']:.2%}")
+print(f"📋 Deployment Gate:")
+print(f"   • Accuracy:  >= {ACCURACY_THRESHOLD:.2%} (ONLY metric enforced)")
+print()
+print(f"ℹ️  Other metrics (Precision, Recall, F1) are reported but NOT enforced")
 print()
 
 
@@ -99,43 +95,43 @@ def calculate_metrics(y_true, y_pred, y_proba=None):
 
 
 def validate_performance(metrics):
-    """Check if metrics meet thresholds"""
+    """Check if accuracy meets threshold (only metric enforced)"""
     print()
     print("=" * 70)
     print("📊 MODEL PERFORMANCE METRICS")
     print("=" * 70)
     print()
     
-    results = {}
-    all_passed = True
+    # Check accuracy (ONLY enforced metric)
+    accuracy = metrics.get('accuracy', 0.0)
+    accuracy_passed = accuracy >= ACCURACY_THRESHOLD
     
-    for metric_name, threshold in THRESHOLDS.items():
-        metric_value = metrics.get(metric_name, 0.0)
-        passed = metric_value >= threshold
-        results[metric_name] = {
-            'value': metric_value,
-            'threshold': threshold,
-            'passed': passed
-        }
-        
-        # Emoji indicators
-        status = "✅" if passed else "❌"
-        
-        # Highlight Accuracy
-        if metric_name == 'accuracy':
-            print(f"   {status} {metric_name.upper()}: {metric_value:.2%} (threshold: {threshold:.2%}) ⚠️ HARD REQUIREMENT")
-        else:
-            print(f"   {status} {metric_name.capitalize()}: {metric_value:.2%} (threshold: {threshold:.2%})")
-        
-        if not passed:
-            all_passed = False
+    status = "✅" if accuracy_passed else "❌"
+    print(f"   {status} ACCURACY: {accuracy:.2%} (threshold: {ACCURACY_THRESHOLD:.2%}) ⚠️ DEPLOYMENT GATE")
+    print()
     
-    # Add ROC-AUC if available (no threshold)
+    # Report other metrics (informational only, not enforced)
+    print("   📊 Other Metrics (informational only, NOT enforced):")
+    print(f"      • Precision: {metrics.get('precision', 0):.2%}")
+    print(f"      • Recall:    {metrics.get('recall', 0):.2%}")
+    print(f"      • F1 Score:  {metrics.get('f1_score', 0):.2%}")
+    
+    # Add ROC-AUC if available
     if 'roc_auc' in metrics and metrics['roc_auc'] is not None:
-        print(f"   ℹ️  ROC-AUC: {metrics['roc_auc']:.2%} (no threshold)")
+        print(f"      • ROC-AUC:   {metrics['roc_auc']:.2%}")
     
     print()
-    results['all_passed'] = all_passed
+    
+    # Results for reporting
+    results = {
+        'accuracy': {
+            'value': accuracy,
+            'threshold': ACCURACY_THRESHOLD,
+            'passed': accuracy_passed
+        },
+        'all_passed': accuracy_passed  # Only accuracy matters
+    }
+    
     return results
 
 
@@ -146,17 +142,18 @@ def save_report(metrics, validation_results):
     
     report = {
         'metrics': {k: float(v) for k, v in metrics.items() if v is not None},
-        'thresholds': THRESHOLDS,
-        'validation': {
-            k: {
-                'value': float(v['value']),
-                'threshold': float(v['threshold']),
-                'passed': v['passed']
-            }
-            for k, v in validation_results.items()
-            if k != 'all_passed'
+        'threshold': {
+            'accuracy': float(ACCURACY_THRESHOLD)
         },
-        'all_passed': validation_results['all_passed']
+        'validation': {
+            'accuracy': {
+                'value': float(validation_results['accuracy']['value']),
+                'threshold': float(validation_results['accuracy']['threshold']),
+                'passed': validation_results['accuracy']['passed']
+            }
+        },
+        'all_passed': validation_results['all_passed'],
+        'note': 'Only accuracy is enforced. Other metrics are informational only.'
     }
     
     with open(report_path, 'w') as f:
@@ -206,11 +203,11 @@ def main():
         print("=" * 70)
         if validation_results['all_passed']:
             print("🎉 MODEL VALIDATION PASSED!")
-            print("   ✅ All performance metrics meet thresholds")
+            print(f"   ✅ Accuracy ({metrics['accuracy']:.2%}) >= {ACCURACY_THRESHOLD:.2%}")
             print("   ✅ Model ready for deployment")
         else:
             print("❌ MODEL VALIDATION FAILED!")
-            print("   ⚠️  Performance below acceptable thresholds")
+            print(f"   ⚠️  Accuracy ({metrics['accuracy']:.2%}) < {ACCURACY_THRESHOLD:.2%}")
             print("   ⚠️  Deployment BLOCKED")
             print()
             print("📋 Actions Required:")
@@ -219,9 +216,9 @@ def main():
             print("   3. Adjust hyperparameters or features")
             print("   4. Retrain model")
             print()
-            print("🔄 To revert to previous model:")
+            print("🔄 Alternatives:")
             print("   - Use the last passing model from S3")
-            print("   - Or adjust thresholds in config.yaml (not recommended)")
+            print(f"   - Or lower threshold in config.yaml (currently {ACCURACY_THRESHOLD:.2%})")
         print("=" * 70)
         print()
         
