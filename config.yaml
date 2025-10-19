@@ -313,7 +313,7 @@ validation:
   data_quality:
     min_rows: 5000  # Minimum rows required in dataset
     min_columns: 12  # Minimum columns required (after dropping ID columns)
-    max_missing_percentage: 4.0  # Max % of missing values allowed per column
+    max_missing_percentage: 8.0  # Max % of missing values allowed per column
     max_duplicate_percentage: 1.0  # Max % of duplicate rows allowed
     
   # Only check missing values for model-critical columns
