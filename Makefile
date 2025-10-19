@@ -76,7 +76,7 @@ help:
 	@echo "  make train-pipeline-local   - Run training (saves to artifacts/models/)"
 	@echo "  make inference-pipeline-local - Run inference locally"
 	@echo "  make run-all-local          - Run all pipelines locally"
-	@echo "  make validate-model-local   - Validate local model (F1 >= 75%)"
+	@echo "  make validate-model-local   - Validate local model (Accuracy >= 75%)"
 	@echo ""
 	@echo "🐳 Environment Control:"
 	@echo "  CONTAINERIZED=true make train-pipeline    - Use Docker MLflow URL"

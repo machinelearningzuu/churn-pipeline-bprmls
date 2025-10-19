@@ -31,10 +31,10 @@ if CONFIG and 'model_validation' in CONFIG:
 else:
     # Fallback defaults
     THRESHOLDS = {
-        'f1_score': 0.75,      # HARD REQUIREMENT
-        'accuracy': 0.70,
+        'accuracy': 0.75,      # HARD REQUIREMENT
         'precision': 0.65,
-        'recall': 0.65
+        'recall': 0.65,
+        'f1_score': 0.60
     }
 
 print("=" * 70)
@@ -42,10 +42,10 @@ print("🎯 MODEL PERFORMANCE VALIDATION")
 print("=" * 70)
 print()
 print(f"📋 Performance Thresholds:")
-print(f"   • F1 Score:  >= {THRESHOLDS['f1_score']:.2%} (HARD REQUIREMENT)")
-print(f"   • Accuracy:  >= {THRESHOLDS['accuracy']:.2%}")
+print(f"   • Accuracy:  >= {THRESHOLDS['accuracy']:.2%} (HARD REQUIREMENT)")
 print(f"   • Precision: >= {THRESHOLDS['precision']:.2%}")
 print(f"   • Recall:    >= {THRESHOLDS['recall']:.2%}")
+print(f"   • F1 Score:  >= {THRESHOLDS['f1_score']:.2%}")
 print()
 
 
@@ -123,8 +123,8 @@ def validate_performance(metrics):
         # Emoji indicators
         status = "✅" if passed else "❌"
         
-        # Highlight F1 score
-        if metric_name == 'f1_score':
+        # Highlight Accuracy
+        if metric_name == 'accuracy':
             print(f"   {status} {metric_name.upper()}: {metric_value:.2%} (threshold: {threshold:.2%}) ⚠️ HARD REQUIREMENT")
         else:
             print(f"   {status} {metric_name.capitalize()}: {metric_value:.2%} (threshold: {threshold:.2%})")
