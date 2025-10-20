@@ -292,7 +292,7 @@ def run_pandas_inference(model_timestamp=None):
     """Run inference using pandas (fast, default)."""
     logger.info("🐼 Using pandas for batch inference (fast, lightweight)")
     logger.info(f"\n{'='*80}")
-    logger.info("🎯 PANDAS BATCH INFERENCE PIPELINE")
+    logger.info("🎯 INFERENCE PIPELINE")
     logger.info(f"{'='*80}")
     
     try:
@@ -655,7 +655,7 @@ def run_pandas_inference(model_timestamp=None):
         logger.info(f"  • Revenue protection: Focus on {high_risk:,} high-risk customers first")
         
         logger.info(f"\n{'='*80}")
-        logger.info("🎉 PANDAS INFERENCE PIPELINE COMPLETED SUCCESSFULLY!")
+        logger.info("🎉 INFERENCE PIPELINE COMPLETED SUCCESSFULLY!")
         logger.info(f"{'='*80}")
         logger.info(f"📊 TECHNICAL SUMMARY:")
         logger.info(f"  • Model accuracy: {accuracy:.4f}")

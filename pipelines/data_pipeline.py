@@ -679,7 +679,7 @@ def _run_pandas_pipeline(data_path, target_column, test_size, force_rebuild, out
         # Pipeline completion summary
         total_pipeline_time = time.time() - pipeline_start
         logger.info(f"\n{'='*80}")
-        logger.info("🎉 PANDAS DATA PIPELINE COMPLETED SUCCESSFULLY!")
+        logger.info("🎉 DATA PIPELINE COMPLETED SUCCESSFULLY!")
         logger.info(f"{'='*80}")
         logger.info(f"📊 FINAL RESULTS:")
         logger.info(f"  • Total processing time: {total_pipeline_time:.2f} seconds")
@@ -698,6 +698,117 @@ def _run_pandas_pipeline(data_path, target_column, test_size, force_rebuild, out
         logger.info(f"  • feature_names.json: Complete dataset metadata")
         logger.info(f"🎯 Engine used: Pandas + Scikit-learn (fast, efficient)")
         logger.info(f"{'='*80}")
+        
+        # Log artifacts to MLflow before ending run
+        logger.info(f"\n{'='*60}")
+        logger.info("📤 LOGGING ARTIFACTS TO MLFLOW")
+        logger.info(f"{'='*60}")
+        
+        try:
+            import tempfile
+            import json
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            
+            # Create temporary directory for artifacts
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # 1. Log data distribution plots
+                fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+                
+                # Training set size
+                axes[0, 0].bar(['Train', 'Test'], [len(X_train), len(X_test)], color=['#2ecc71', '#3498db'])
+                axes[0, 0].set_title('Train/Test Split')
+                axes[0, 0].set_ylabel('Samples')
+                
+                # Target distribution in train
+                train_target_dist = y_train.value_counts()
+                axes[0, 1].bar(train_target_dist.index.astype(str), train_target_dist.values, color=['#e74c3c', '#2ecc71'])
+                axes[0, 1].set_title('Training Set - Target Distribution')
+                axes[0, 1].set_xlabel('Target')
+                axes[0, 1].set_ylabel('Count')
+                
+                # Target distribution in test
+                test_target_dist = y_test.value_counts()
+                axes[1, 0].bar(test_target_dist.index.astype(str), test_target_dist.values, color=['#e74c3c', '#2ecc71'])
+                axes[1, 0].set_title('Test Set - Target Distribution')
+                axes[1, 0].set_xlabel('Target')
+                axes[1, 0].set_ylabel('Count')
+                
+                # Features count
+                axes[1, 1].text(0.5, 0.5, f'{X_train.shape[1]} Features', 
+                               ha='center', va='center', fontsize=24, weight='bold')
+                axes[1, 1].set_title('Total Features')
+                axes[1, 1].axis('off')
+                
+                plt.tight_layout()
+                dist_path = os.path.join(tmpdir, 'data_distribution.png')
+                plt.savefig(dist_path)
+                plt.close()
+                mlflow.log_artifact(dist_path, "plots")
+                logger.info(f"✅ Data distribution plot logged")
+                
+                # 2. Log data statistics as JSON
+                data_stats = {
+                    'pipeline_timestamp': pipeline_timestamp,
+                    'total_samples': len(df),
+                    'train_samples': len(X_train),
+                    'test_samples': len(X_test),
+                    'n_features': X_train.shape[1],
+                    'target_column': target_column,
+                    'train_class_distribution': y_train.value_counts().to_dict(),
+                    'test_class_distribution': y_test.value_counts().to_dict(),
+                    'processing_time_seconds': float(total_pipeline_time)
+                }
+                stats_path = os.path.join(tmpdir, 'data_statistics.json')
+                with open(stats_path, 'w') as f:
+                    json.dump(data_stats, f, indent=2)
+                mlflow.log_artifact(stats_path, "data")
+                logger.info(f"✅ Data statistics logged")
+                
+                # 3. Log preprocessing configuration
+                preprocessing_config = {
+                    'encoders': {
+                        'Geography': {
+                            'type': 'OneHotEncoder',
+                            'categories': encoders.get('Geography', {}).get('categories', [])
+                        },
+                        'Gender': {
+                            'type': 'OneHotEncoder',
+                            'categories': encoders.get('Gender', {}).get('categories', [])
+                        }
+                    },
+                    'scaler': {
+                        'type': 'MinMaxScaler',
+                        'features': available_numeric
+                    },
+                    'binning': {
+                        'CreditScore': {
+                            'bins': list(credit_score_bins.keys())
+                        }
+                    }
+                }
+                config_path = os.path.join(tmpdir, 'preprocessing_config.json')
+                with open(config_path, 'w') as f:
+                    json.dump(preprocessing_config, f, indent=2)
+                mlflow.log_artifact(config_path, "config")
+                logger.info(f"✅ Preprocessing configuration logged")
+                
+                # 4. Log feature names
+                feature_path = os.path.join(tmpdir, 'feature_names.txt')
+                with open(feature_path, 'w') as f:
+                    f.write('\n'.join(X_train.columns.tolist()))
+                mlflow.log_artifact(feature_path, "data")
+                logger.info(f"✅ Feature names logged")
+            
+            logger.info(f"✅ All data pipeline artifacts logged to MLflow")
+            
+        except Exception as artifact_error:
+            logger.error(f"❌ MLflow artifact logging failed: {str(artifact_error)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            logger.warning(f"⚠️ Continuing without MLflow artifacts...")
         
         # End MLflow run
         mlflow_tracker.end_run()

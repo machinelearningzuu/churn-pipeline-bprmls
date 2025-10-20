@@ -86,7 +86,7 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
     """Train model using scikit-learn (fast, default)."""
     logger.info("🔬 Scikit-learn training - no Spark session needed!")
     logger.info(f"\n{'='*80}")
-    logger.info("🎯 SKLEARN MODEL TRAINING PIPELINE")
+    logger.info("🎯 TRAINING PIPELINE")
     logger.info(f"{'='*80}")
     
     try:
@@ -264,32 +264,119 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
         
         # Log metrics to MLflow
         mlflow.log_metrics(metrics)
+        logger.info(f"✅ Metrics logged to MLflow")
         
-        # Log model to MLflow with optional registration
+        # Log parameters to MLflow
+        mlflow.log_params({
+            'n_estimators': model.n_estimators,
+            'max_depth': model.max_depth,
+            'random_state': model.random_state,
+            'n_features': X_train.shape[1],
+            'n_train_samples': X_train.shape[0],
+            'n_test_samples': X_test.shape[0]
+        })
+        logger.info(f"✅ Parameters logged to MLflow")
+        
+        # Log model artifacts to MLflow
         try:
             from mlflow.models.signature import infer_signature
+            import tempfile
+            import json
+            from sklearn.metrics import confusion_matrix
+            import matplotlib
+            matplotlib.use('Agg')  # Non-interactive backend
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            
+            # Create signature for model
             signature = infer_signature(X_train, y_pred)
             
-            # Log model (without registration for now to avoid API issues)
+            # Log the trained model
             mlflow.sklearn.log_model(
                 model, 
                 "model",
-                signature=signature
+                signature=signature,
+                registered_model_name="churn_prediction_sklearn"
             )
             logger.info(f"✅ Model logged to MLflow successfully")
             
-            # Try to register model (optional)
-            try:
-                mlflow.register_model(
-                    f"runs:/{mlflow.active_run().info.run_id}/model",
-                    "churn_prediction_sklearn"
-                )
-                logger.info(f"✅ Model registered in MLflow registry")
-            except Exception as reg_error:
-                logger.warning(f"⚠️ Model registration failed (continuing anyway): {str(reg_error)}")
+            # Create temporary directory for artifacts
+            with tempfile.TemporaryDirectory() as tmpdir:
+                # 1. Log confusion matrix plot
+                cm = confusion_matrix(y_test, y_pred)
+                plt.figure(figsize=(8, 6))
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                plt.title('Confusion Matrix')
+                plt.ylabel('True Label')
+                plt.xlabel('Predicted Label')
+                cm_path = os.path.join(tmpdir, 'confusion_matrix.png')
+                plt.savefig(cm_path)
+                plt.close()
+                mlflow.log_artifact(cm_path, "plots")
+                logger.info(f"✅ Confusion matrix plot logged")
+                
+                # 2. Log feature importance plot
+                if hasattr(model, 'feature_importances_'):
+                    feature_importance = pd.DataFrame({
+                        'feature': [f'feature_{i}' for i in range(len(model.feature_importances_))],
+                        'importance': model.feature_importances_
+                    }).sort_values('importance', ascending=False).head(20)
+                    
+                    plt.figure(figsize=(10, 8))
+                    plt.barh(feature_importance['feature'], feature_importance['importance'])
+                    plt.xlabel('Importance')
+                    plt.title('Top 20 Feature Importances')
+                    plt.gca().invert_yaxis()
+                    fi_path = os.path.join(tmpdir, 'feature_importance.png')
+                    plt.savefig(fi_path, bbox_inches='tight')
+                    plt.close()
+                    mlflow.log_artifact(fi_path, "plots")
+                    logger.info(f"✅ Feature importance plot logged")
+                    
+                    # Log feature importance as JSON
+                    fi_json_path = os.path.join(tmpdir, 'feature_importance.json')
+                    with open(fi_json_path, 'w') as f:
+                        json.dump(feature_importance.to_dict('records'), f, indent=2)
+                    mlflow.log_artifact(fi_json_path, "data")
+                
+                # 3. Log classification report as text
+                from sklearn.metrics import classification_report
+                report = classification_report(y_test, y_pred)
+                report_path = os.path.join(tmpdir, 'classification_report.txt')
+                with open(report_path, 'w') as f:
+                    f.write(report)
+                mlflow.log_artifact(report_path, "reports")
+                logger.info(f"✅ Classification report logged")
+                
+                # 4. Log training metadata as JSON
+                metadata = {
+                    'model_type': 'RandomForestClassifier',
+                    'training_timestamp': pipeline_timestamp,
+                    'data_timestamp': data_timestamp,
+                    'training_samples': int(X_train.shape[0]),
+                    'test_samples': int(X_test.shape[0]),
+                    'n_features': int(X_train.shape[1]),
+                    'metrics': {k: float(v) for k, v in metrics.items()},
+                    'hyperparameters': {
+                        'n_estimators': int(model.n_estimators),
+                        'max_depth': int(model.max_depth) if model.max_depth else None,
+                        'random_state': int(model.random_state)
+                    }
+                }
+                metadata_path = os.path.join(tmpdir, 'training_metadata.json')
+                with open(metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+                mlflow.log_artifact(metadata_path, "metadata")
+                logger.info(f"✅ Training metadata logged")
+            
+            logger.info(f"✅ All artifacts logged to MLflow successfully")
                 
         except Exception as log_error:
-            logger.warning(f"⚠️ MLflow model logging failed (continuing anyway): {str(log_error)}")
+            logger.error(f"❌ MLflow artifact logging failed: {str(log_error)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # Don't fail the pipeline, but make the error visible
+            logger.warning(f"⚠️ Continuing without MLflow artifacts...")
         
         logger.info(f"✅ Model training completed!")
         logger.info(f"📊 Training metrics:")
@@ -439,7 +526,7 @@ def _train_sklearn_model(data_path, model_params, test_size, random_state, model
             logger.info(f"🔗 Local model_path reference: {model_path} (not created locally)")
         
         logger.info(f"\n{'='*80}")
-        logger.info("🎉 SKLEARN TRAINING PIPELINE COMPLETED SUCCESSFULLY!")
+        logger.info("🎉 TRAINING PIPELINE COMPLETED SUCCESSFULLY!")
         logger.info(f"{'='*80}")
         logger.info(f"📊 TRAINING RESULTS:")
         logger.info(f"  • Model accuracy: {accuracy:.4f} (86.50%)")
