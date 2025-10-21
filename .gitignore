@@ -368,8 +368,6 @@ DEPLOYMENT_ISOLATION.md
 !docs/KAFKA_QUICKSTART.md
 !docs/STUDENT_SETUP.md
 !tests/README_SIMPLIFIED.md
-!changelog.md
-!stepplan.md
 !config.yaml
 !requirements.txt
 !requirements-mlflow.txt
