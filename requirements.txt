@@ -33,7 +33,7 @@ xlrd>=2.0.0
 # API and Web (for potential deployment)
 fastapi>=0.95.0
 uvicorn>=0.20.0
-pydantic>=2.0.0,<2.11.2
+pydantic>=2.0.0,<2.12.6
 
 # Monitoring and Logging (MLflow will be added back later)
 mlflow>=1.30.0
