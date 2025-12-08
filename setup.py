@@ -27,7 +27,7 @@ setup(
         "xlrd>=2.0.0",
         "fastapi>=0.95.0",
         "uvicorn>=0.20.0",
-        "pydantic>=2.0.0,<2.11.2",
+        "pydantic>=2.0.0,<2.12.6",
         "mlflow>=1.30.0",
         "wandb>=0.15.0",
         "pytest>=7.0.0",
