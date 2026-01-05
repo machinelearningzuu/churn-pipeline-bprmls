@@ -1,6 +1,6 @@
 # MLflow Tracking Server Requirements
 mlflow==2.8.1
-boto3==1.34.162
+boto3==1.42.21
 botocore==1.34.162
 psycopg2-binary==2.9.9
 sqlalchemy==2.0.23
